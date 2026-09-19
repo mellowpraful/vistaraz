@@ -1,31 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { matchResources } from "@/lib/dispatch/capability-matcher";
+import { matchResources, auditResourceEligibility } from "@/lib/dispatch/capability-matcher";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { incidentId } = body;
+    const { incidentId, strict = true } = body;
 
     if (!incidentId) {
-      return NextResponse.json({ error: "incidentId is required" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "incidentId is required" }, { status: 400 });
     }
 
     // Fetch incident
-    const incident = await prisma.incident.findUnique({ where: { id: incidentId } });
-    if (!incident) {
-      return NextResponse.json({ error: "Incident not found" }, { status: 404 });
-    }
-
-    // Fetch all resources with capabilities
-    const resources = await prisma.resource.findMany({
-      include: { capabilities: true },
+    const incident = await prisma.incident.findUnique({
+      where: { id: incidentId },
+      include: {
+        assignments: {
+          include: { resource: { select: { id: true, name: true, type: true } } },
+        },
+      },
     });
 
-    // Run the capability matcher
-    const matches = matchResources(incident, resources);
+    if (!incident) {
+      return NextResponse.json({ success: false, error: "Incident not found" }, { status: 404 });
+    }
 
-    // Store recommendations in DB (replacing any existing PENDING ones)
+    // Fetch all resources with capabilities and agency
+    const resources = await prisma.resource.findMany({
+      include: {
+        capabilities: true,
+        agency: true,
+      },
+    });
+
+    // Run capability matcher and eligibility audit
+    const audit = auditResourceEligibility(incident, resources, { strict });
+    const matches = audit.eligible.slice(0, 5);
+
+    // Store recommendations in DB (replacing existing PENDING ones)
     await prisma.dispatchRecommendation.updateMany({
       where: { incidentId, status: "PENDING" },
       data: { status: "SUPERSEDED" },
@@ -33,6 +45,11 @@ export async function POST(req: NextRequest) {
 
     const recommendations = await Promise.all(
       matches.map(async (match) => {
+        const constraintsPayload = {
+          constraints: match.constraints,
+          scoreBreakdown: match.scoreBreakdown,
+        };
+
         return prisma.dispatchRecommendation.create({
           data: {
             incidentId,
@@ -44,13 +61,16 @@ export async function POST(req: NextRequest) {
             matchedCapabilities: JSON.stringify(match.matchedCapabilities),
             missingCapabilities: JSON.stringify(match.missingCapabilities),
             reasons: JSON.stringify(match.reasons),
-            constraints: match.constraints.length > 0
-              ? JSON.stringify(match.constraints)
-              : null,
+            constraints: JSON.stringify(constraintsPayload),
             status: "PENDING",
           },
           include: {
-            resource: { include: { capabilities: true } },
+            resource: {
+              include: {
+                capabilities: true,
+                agency: true,
+              },
+            },
           },
         });
       })
@@ -66,19 +86,31 @@ export async function POST(req: NextRequest) {
         after: JSON.stringify({
           recommendationCount: recommendations.length,
           topResourceId: recommendations[0]?.resourceId,
+          topScore: recommendations[0]?.score,
         }),
-        metadata: JSON.stringify({ algorithm: "capability-matcher-v1" }),
+        metadata: JSON.stringify({ algorithm: "capability-matcher-v2-explainable" }),
       },
     });
 
     return NextResponse.json({
+      success: true,
+      data: recommendations,
       recommendations,
+      ineligible: audit.ineligible,
       totalCandidates: resources.length,
-      eligibleCandidates: matches.length,
-      incident: { id: incident.id, title: incident.title, severity: incident.severity },
+      eligibleCandidates: audit.eligible.length,
+      incident: {
+        id: incident.id,
+        title: incident.title,
+        severity: incident.severity,
+        type: incident.type,
+        locationName: incident.locationName,
+        requiredCapabilities: incident.requiredCapabilities,
+      },
     });
   } catch (error) {
     console.error("POST /api/dispatch/recommend error:", error);
-    return NextResponse.json({ error: "Failed to generate recommendations" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to generate recommendations" }, { status: 500 });
   }
 }
+

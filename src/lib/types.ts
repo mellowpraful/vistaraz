@@ -132,11 +132,23 @@ export const DispatchRecommendationSchema = z.object({
 export type DispatchRecommendation = z.infer<typeof DispatchRecommendationSchema>;
 
 export const ApproveDispatchSchema = z.object({
-  recommendationId: z.string(),
-  action: z.enum(["APPROVED", "REJECTED", "MODIFIED"]),
+  recommendationId: z.string().optional(),
+  incidentId: z.string().optional(),
+  resourceId: z.string().optional(),
+  action: z
+    .enum(["APPROVED", "REJECTED", "MODIFIED", "APPROVE", "REJECT", "MANUAL_OVERRIDE"])
+    .transform((val) => {
+      if (val === "APPROVE") return "APPROVED";
+      if (val === "REJECT") return "REJECTED";
+      if (val === "MANUAL_OVERRIDE") return "MODIFIED";
+      return val;
+    }),
   notes: z.string().optional(),
-  userId: z.string().default("demo-operator"),
+  rejectionReason: z.string().optional(),
+  userId: z.string().optional(),
+  approvedBy: z.string().optional(),
 });
+
 
 export const AuditLogSchema = z.object({
   id: z.string(),

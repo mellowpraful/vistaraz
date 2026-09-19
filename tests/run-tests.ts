@@ -227,6 +227,120 @@ async function runTests() {
   );
   assert(searchByMission.length === 1 && searchByMission[0].id === "res-2", "Searches resources by active mission title");
 
+  // ─── 9. RapidAid Explainable Scoring Breakdown Tests ────────
+  console.log("\n🔹 9. RapidAid Explainable Scoring Breakdown Tests");
+  const explainableRecs = matchResources(mockIncident as any, mockResources as any);
+  assert(explainableRecs.length > 0, "Generated recommendations with explainable matrix");
+  const topCandidate = explainableRecs[0];
+  assert(topCandidate.scoreBreakdown !== undefined, "Score breakdown object attached to recommendation");
+  assert(topCandidate.scoreBreakdown.factors.length >= 4, "Granular factor breakdown provided (>= 4 factors)");
+  assert(topCandidate.scoreBreakdown.baseScore === 100, "Base allocation score is 100");
+  assert(topCandidate.scoreBreakdown.totalScore === topCandidate.score, "Sum of breakdown equals final score");
+  const hasReliabilityFactor = topCandidate.scoreBreakdown.factors.some((f) => f.category === "reliability");
+  assert(hasReliabilityFactor, "Reliability rating factor present in scoring breakdown");
+
+  // ─── 10. Hard Capability Eligibility Rule Tests ───────────────
+  console.log("\n🔹 10. Strict Capability Eligibility Hard Filter Tests");
+  const { auditResourceEligibility } = await import("../src/lib/dispatch/capability-matcher");
+  const severeFloodIncident = {
+    id: "severe-flood-1",
+    severity: "CRITICAL",
+    type: "FLOOD",
+    latitude: 23.0,
+    longitude: 72.0,
+    requiredCapabilities: JSON.stringify(["WATER_RESCUE", "FLOOD_EVACUATION"]),
+  };
+
+  const testUnits = [
+    {
+      id: "unit-matching-boat",
+      name: "NDRF Flood Boat 01",
+      type: "BOAT",
+      status: "AVAILABLE",
+      latitude: 23.05,
+      longitude: 72.05,
+      reliabilityScore: 0.95,
+      currentWorkload: 0,
+      capabilities: [
+        { capability: "WATER_RESCUE", equipment: "Life Jackets" },
+        { capability: "FLOOD_EVACUATION", equipment: "Rafts" },
+      ],
+    },
+    {
+      id: "unit-incompatible-police",
+      name: "Police Cruiser 09 (Zero Distance but Missing Water Rescue)",
+      type: "POLICE_UNIT",
+      status: "AVAILABLE",
+      latitude: 23.0, // exactly at incident site
+      longitude: 72.0,
+      reliabilityScore: 1.0,
+      currentWorkload: 0,
+      capabilities: [{ capability: "CROWD_CONTROL", equipment: null }],
+    },
+    {
+      id: "unit-dispatched-boat",
+      name: "NDRF Boat 02 (Has Capability but Already Dispatched)",
+      type: "BOAT",
+      status: "DISPATCHED",
+      latitude: 23.01,
+      longitude: 72.01,
+      reliabilityScore: 0.9,
+      currentWorkload: 80,
+      capabilities: [
+        { capability: "WATER_RESCUE", equipment: null },
+        { capability: "FLOOD_EVACUATION", equipment: null },
+      ],
+    },
+  ];
+
+  const auditResult = auditResourceEligibility(severeFloodIncident as any, testUnits as any);
+  assert(auditResult.eligible.length === 1, "Only unit meeting ALL required capabilities and AVAILABLE status is eligible");
+  assert(auditResult.eligible[0].resource.id === "unit-matching-boat", "Eligible unit is the NDRF Flood Boat");
+  assert(auditResult.ineligible.length === 2, "Incompatible and busy units are flagged as ineligible");
+
+  const policeIneligibility = auditResult.ineligible.find((i) => i.resource.id === "unit-incompatible-police");
+  assert(
+    policeIneligibility !== undefined && policeIneligibility.reasons.some((r) => r.includes("Missing")),
+    "Incompatible unit ineligible reason explicitly states missing required capability despite 0km proximity"
+  );
+
+  const busyUnitIneligibility = auditResult.ineligible.find((i) => i.resource.id === "unit-dispatched-boat");
+  assert(
+    busyUnitIneligibility !== undefined && busyUnitIneligibility.reasons.some((r) => r.includes("Ineligible status")),
+    "Busy DISPATCHED unit flagged as ineligible due to active deployment status"
+  );
+
+  // ─── 11. Dispatch Approval & Rejection Schema Tests ───────────
+  console.log("\n🔹 11. Dispatch Approval, Rejection & Commander Override Schema Tests");
+  const { ApproveDispatchSchema } = await import("../src/lib/types");
+
+  // Approval schema parse
+  const validApproval = {
+    recommendationId: "rec-test-1",
+    action: "APPROVED",
+    notes: "Approved for immediate deployment",
+    userId: "demo-commander",
+  };
+  assert(ApproveDispatchSchema.safeParse(validApproval).success === true, "Standard recommendation approval passes validation");
+
+  // Rejection schema parse
+  const validRejection = {
+    recommendationId: "rec-test-2",
+    action: "REJECTED",
+    rejectionReason: "Unit retained for reserve",
+  };
+  const parseRejection = ApproveDispatchSchema.safeParse(validRejection);
+  assert(parseRejection.success === true && parseRejection.data.action === "REJECTED", "Rejection action parses and transforms cleanly");
+
+  // Commander override parse
+  const validOverride = {
+    incidentId: "inc-test-1",
+    resourceId: "res-test-1",
+    action: "MODIFIED",
+    notes: "Commander discretion tactical override",
+  };
+  assert(ApproveDispatchSchema.safeParse(validOverride).success === true, "Commander manual override passes schema validation");
+
   // ─── Summary ────────────────────────────────────────────────
   console.log("\n" + "─".repeat(50));
   console.log(`📊 Test Results: ${passed} Passed, ${failed} Failed`);
@@ -238,4 +352,5 @@ async function runTests() {
 }
 
 runTests();
+
 

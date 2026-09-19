@@ -1,10 +1,33 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { formatRelativeTime } from "@/lib/utils";
+import { extractApiData, parseJsonSafe } from "@/lib/utils";
 import { INCIDENT_TYPE_ICONS } from "@/lib/types";
+import {
+  DispatchRecommendationCard,
+  DispatchRecommendationItem,
+} from "@/components/dispatch/DispatchRecommendationCard";
+import { DispatchApprovalModal } from "@/components/dispatch/DispatchApprovalModal";
+import { DispatchRejectionModal } from "@/components/dispatch/DispatchRejectionModal";
+import { CommanderOverrideDrawer } from "@/components/dispatch/CommanderOverrideDrawer";
+import { EligibilityAuditDrawer, IneligibleUnit } from "@/components/dispatch/EligibilityAuditDrawer";
+import { EmptyState, LoadingState } from "@/components/ui/EmptyState";
+import {
+  RotateCcw,
+  Zap,
+  Radio,
+  Shield,
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  MapPin,
+  Flame,
+  Info,
+  SlidersHorizontal,
+} from "lucide-react";
 
 interface Incident {
   id: string;
@@ -16,30 +39,19 @@ interface Incident {
   latitude: number | null;
   longitude: number | null;
   requiredCapabilities: string | null;
+  affectedCount?: number | null;
+  injuryCount?: number | null;
+  description?: string;
+  createdAt?: string | Date;
 }
 
-interface Resource {
+interface ResourceOption {
   id: string;
   name: string;
   type: string;
   status: string;
-  agency: { name: string };
-  capabilities: Array<{ capability: string }>;
-}
-
-interface Recommendation {
-  id: string;
-  resourceId: string;
-  score: number;
-  etaMinutes: number | null;
-  distanceKm: number | null;
-  reasons: string;
-  resource: {
-    name: string;
-    type: string;
-    status: string;
-    agency: { name: string };
-  };
+  agency?: { name: string } | null;
+  capabilities?: Array<{ capability: string }>;
 }
 
 function DispatchContent() {
@@ -50,68 +62,92 @@ function DispatchContent() {
   const [selectedIncidentId, setSelectedIncidentId] = useState(initialIncidentId);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
 
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [recommendations, setRecommendations] = useState<DispatchRecommendationItem[]>([]);
+  const [ineligibleUnits, setIneligibleUnits] = useState<IneligibleUnit[]>([]);
+  const [resources, setResources] = useState<ResourceOption[]>([]);
+  const [loading, setLoading] = useState(true);
   const [recommending, setRecommending] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [feedbackBanner, setFeedbackBanner] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Manual Override Form
-  const [overrideResourceId, setOverrideResourceId] = useState("");
-  const [overrideReason, setOverrideReason] = useState("");
   const [showOverride, setShowOverride] = useState(false);
 
-  // Rejection modal
-  const [rejectRecId, setRejectRecId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("Unit needed for higher priority area");
+  // Modals state
+  const [approvalRec, setApprovalRec] = useState<DispatchRecommendationItem | null>(null);
+  const [isApprovalOpen, setIsApprovalOpen] = useState(false);
+  const [rejectRec, setRejectRec] = useState<DispatchRecommendationItem | null>(null);
+  const [isRejectOpen, setIsRejectOpen] = useState(false);
 
   // Fetch all active incidents
   const fetchIncidents = useCallback(async () => {
     try {
-      const res = await fetch("/api/incidents?status=REPORTED,VERIFIED,ASSIGNED,IN_PROGRESS");
+      const res = await fetch("/api/incidents");
       const json = await res.json();
-      if (json.success) {
-        setIncidents(json.data);
-        if (!selectedIncidentId && json.data.length > 0) {
-          setSelectedIncidentId(json.data[0].id);
-        }
+      const data = extractApiData<Incident>(json);
+      setIncidents(data);
+
+      if (!selectedIncidentId && data.length > 0) {
+        setSelectedIncidentId(data[0].id);
+        setSelectedIncident(data[0]);
+      } else if (selectedIncidentId) {
+        const found = data.find((i) => i.id === selectedIncidentId);
+        if (found) setSelectedIncident(found);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load incidents:", err);
+      setErrorBanner("Failed to sync active emergency incidents feed");
+    } finally {
+      setLoading(false);
     }
   }, [selectedIncidentId]);
 
-  // Fetch all resources for manual override
+  // Fetch all resources for manual override drawer
   const fetchResources = useCallback(async () => {
     try {
-      const res = await fetch("/api/resources?status=AVAILABLE");
+      const res = await fetch("/api/resources");
       const json = await res.json();
-      if (json.success) {
-        setResources(json.data);
-      }
+      const data = extractApiData<ResourceOption>(json);
+      setResources(data);
     } catch (err) {
       console.error("Failed to load resources:", err);
     }
   }, []);
 
-  // Fetch recommendations for selected incident
-  const fetchRecommendations = useCallback(async (incId: string) => {
+  // Fetch recommendations for the selected incident
+  const fetchRecommendations = useCallback(async (incId: string, isManual = false) => {
     if (!incId) return;
+    if (isManual) setIsRefreshing(true);
     setRecommending(true);
+    setErrorBanner(null);
+
     try {
       const res = await fetch("/api/dispatch/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ incidentId: incId }),
+        body: JSON.stringify({ incidentId: incId, strict: true }),
       });
+
       const json = await res.json();
-      if (json.success) {
-        setRecommendations(json.data);
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to generate capability recommendations");
       }
-    } catch (err) {
+
+      const recs = json.data || json.recommendations || [];
+      setRecommendations(recs);
+      setIneligibleUnits(json.ineligible || []);
+    } catch (err: any) {
       console.error("Failed to generate recommendations:", err);
+      setErrorBanner(err.message || "Failed to generate AI capability recommendations");
+      setRecommendations([]);
     } finally {
       setRecommending(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -128,128 +164,142 @@ function DispatchContent() {
     }
   }, [selectedIncidentId, incidents, fetchRecommendations]);
 
-  const handleApprove = async (recommendationId: string, resourceId: string) => {
-    setProcessingId(recommendationId);
-    try {
-      const res = await fetch("/api/dispatch/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          incidentId: selectedIncidentId,
-          resourceId,
-          recommendationId,
-          action: "APPROVE",
-          approvedBy: "demo-commander",
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        fetchRecommendations(selectedIncidentId);
-        fetchIncidents();
-        fetchResources();
-      }
-    } catch (err) {
-      console.error("Approval error:", err);
-    } finally {
-      setProcessingId(null);
-    }
+  // Handle open approval modal
+  const handleOpenApprove = (rec: DispatchRecommendationItem) => {
+    setApprovalRec(rec);
+    setIsApprovalOpen(true);
   };
 
-  const handleReject = async () => {
-    if (!rejectRecId) return;
-    setProcessingId(rejectRecId);
-    try {
-      const rec = recommendations.find((r) => r.id === rejectRecId);
-      const res = await fetch("/api/dispatch/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          incidentId: selectedIncidentId,
-          resourceId: rec?.resourceId,
-          recommendationId: rejectRecId,
-          action: "REJECT",
-          rejectionReason: rejectReason,
-          approvedBy: "demo-commander",
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setRejectRecId(null);
-        fetchRecommendations(selectedIncidentId);
-      }
-    } catch (err) {
-      console.error("Rejection error:", err);
-    } finally {
-      setProcessingId(null);
-    }
+  // Handle open reject modal
+  const handleOpenReject = (rec: DispatchRecommendationItem) => {
+    setRejectRec(rec);
+    setIsRejectOpen(true);
   };
 
-  const handleManualOverride = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!overrideResourceId || !overrideReason.trim()) return;
-    setProcessingId("manual");
-    try {
-      const res = await fetch("/api/dispatch/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          incidentId: selectedIncidentId,
-          resourceId: overrideResourceId,
-          action: "MANUAL_OVERRIDE",
-          notes: overrideReason,
-          approvedBy: "demo-commander",
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setShowOverride(false);
-        setOverrideResourceId("");
-        setOverrideReason("");
-        fetchRecommendations(selectedIncidentId);
-        fetchIncidents();
-        fetchResources();
-      }
-    } catch (err) {
-      console.error("Manual override error:", err);
-    } finally {
-      setProcessingId(null);
-    }
+  const handleApprovalSuccess = (recId: string) => {
+    setFeedbackBanner({
+      type: "success",
+      text: `Dispatch order successfully authorized and transmitted to field unit terminal.`,
+    });
+    fetchRecommendations(selectedIncidentId);
+    fetchIncidents();
+    fetchResources();
+    setTimeout(() => setFeedbackBanner(null), 5000);
   };
+
+  const handleRejectionSuccess = (recId: string) => {
+    setFeedbackBanner({
+      type: "success",
+      text: `Recommendation rejection and operational rationale successfully logged to compliance audit trail.`,
+    });
+    fetchRecommendations(selectedIncidentId);
+    setTimeout(() => setFeedbackBanner(null), 5000);
+  };
+
+  const handleOverrideSuccess = () => {
+    setFeedbackBanner({
+      type: "success",
+      text: `Commander Manual Tactical Override successfully executed and committed to audit trail.`,
+    });
+    fetchRecommendations(selectedIncidentId);
+    fetchIncidents();
+    fetchResources();
+    setTimeout(() => setFeedbackBanner(null), 5000);
+  };
+
+  // Parsed incident required capabilities
+  const requiredCaps = useMemo(() => {
+    if (!selectedIncident?.requiredCapabilities) return [];
+    return parseJsonSafe<string[]>(selectedIncident.requiredCapabilities, []);
+  }, [selectedIncident]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 animate-fade-in pb-12">
+      {/* Top Studio Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100 flex items-center gap-3">
-            <span>⚡</span> AI Dispatch Recommendation & Approval Studio
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <span className="p-1.5 bg-blue-950 border border-blue-800 rounded-lg text-xl">⚡</span>
+            <h1 className="text-2xl font-black tracking-tight text-slate-100">
+              RapidAid Dispatch Studio
+            </h1>
+          </div>
           <p className="text-sm text-slate-400 mt-1">
-            Human-in-the-loop resource allocation engine powered by capability matching, proximity & workload scoring
+            Explainable capability matching, proximity scoring, and human-authorized resource allocation
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-950/70 border border-blue-800/80 rounded-lg text-xs font-mono text-blue-300">
+            <Radio size={14} className="text-blue-400 animate-pulse" />
+            <span>Human Authorization Mandatory</span>
+          </div>
+
           <button
             onClick={() => setShowOverride(!showOverride)}
-            className="btn-secondary text-xs flex items-center gap-1.5"
+            className={`btn-secondary text-xs flex items-center gap-1.5 px-3 py-2 ${
+              showOverride ? "border-amber-500 text-amber-300 bg-amber-950/30" : ""
+            }`}
           >
-            <span>⚙️</span> {showOverride ? "Hide Manual Override" : "Manual Override"}
+            <ShieldAlert size={14} className="text-amber-400" />
+            <span>{showOverride ? "Close Override" : "Commander Override"}</span>
           </button>
         </div>
       </div>
 
-      {/* Incident Selector Bar */}
-      <div className="card p-4 space-y-3 bg-slate-900 border-slate-800">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Target Incident:
+      {/* Global Feedback Banner */}
+      {feedbackBanner && (
+        <div
+          className={`p-3.5 rounded-xl border text-xs flex items-center justify-between gap-3 animate-slide-in ${
+            feedbackBanner.type === "success"
+              ? "bg-emerald-950/90 border-emerald-800 text-emerald-200"
+              : "bg-red-950/90 border-red-800 text-red-200"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {feedbackBanner.type === "success" ? (
+              <CheckCircle size={16} className="text-emerald-400" />
+            ) : (
+              <AlertTriangle size={16} className="text-red-400" />
+            )}
+            <span className="font-medium">{feedbackBanner.text}</span>
+          </div>
+          <button
+            onClick={() => setFeedbackBanner(null)}
+            className="text-[10px] font-mono text-slate-400 hover:text-slate-200"
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
+
+      {/* Global Error Banner */}
+      {errorBanner && (
+        <div className="p-3.5 bg-red-950/80 border border-red-800 rounded-xl text-xs text-red-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-red-400 flex-shrink-0" />
+            <span>{errorBanner}</span>
+          </div>
+          <button
+            onClick={() => selectedIncidentId && fetchRecommendations(selectedIncidentId, true)}
+            className="text-xs bg-red-900 hover:bg-red-800 text-white px-2.5 py-1 rounded font-mono"
+          >
+            Retry Match
+          </button>
+        </div>
+      )}
+
+      {/* Target Incident Selection & Assessment SITREP */}
+      <div className="card p-5 space-y-4 bg-slate-900/80 border-slate-800 rounded-xl">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-3">
+            <span className="text-xs font-bold uppercase tracking-wider font-mono text-slate-400 flex-shrink-0">
+              Active Incident:
             </span>
             <select
               value={selectedIncidentId}
               onChange={(e) => setSelectedIncidentId(e.target.value)}
-              className="input-base text-xs bg-slate-950 font-semibold flex-1 max-w-xl py-2"
+              className="input text-xs bg-slate-950/90 font-semibold border-slate-800 rounded-lg h-10 w-full max-w-2xl text-slate-100"
             >
               {incidents.map((inc) => (
                 <option key={inc.id} value={inc.id}>
@@ -260,262 +310,185 @@ function DispatchContent() {
           </div>
 
           {selectedIncident && (
-            <Link
-              href={`/incidents/${selectedIncident.id}`}
-              className="btn-secondary text-xs py-1.5 px-3 self-start md:self-auto flex items-center gap-1"
-            >
-              View Full SITREP →
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/incidents/${selectedIncident.id}`}
+                className="btn-secondary text-xs py-2 px-3 flex items-center gap-1 font-mono"
+              >
+                <span>View Full SITREP</span>
+                <span>→</span>
+              </Link>
+            </div>
           )}
         </div>
 
+        {/* Incident Details Summary Bar */}
         {selectedIncident && (
-          <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center gap-4 text-xs text-slate-300">
-            <span className="flex items-center gap-1">
-              <span>{INCIDENT_TYPE_ICONS[selectedIncident.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨"}</span>
-              <strong>{selectedIncident.type}</strong>
-            </span>
-            <span>📍 {selectedIncident.locationName || "Location coordinates set"}</span>
-            <span className="badge-critical text-[10px] px-2 py-0.5 rounded font-mono">
-              {selectedIncident.severity}
-            </span>
-            <span className="badge-neutral text-[10px] px-2 py-0.5 rounded font-mono">
-              {selectedIncident.status}
-            </span>
+          <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-1 font-semibold text-slate-200">
+                <span>{INCIDENT_TYPE_ICONS[selectedIncident.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨"}</span>
+                <span>{selectedIncident.type.replace(/_/g, " ")}</span>
+              </span>
+
+              <span className="text-slate-500">•</span>
+
+              <span className="flex items-center gap-1 text-slate-300">
+                <MapPin size={13} className="text-blue-400" />
+                <span>{selectedIncident.locationName || "Coordinates Registered"}</span>
+              </span>
+
+              <span className="text-slate-500">•</span>
+
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                  selectedIncident.severity === "CRITICAL"
+                    ? "bg-red-950 text-red-300 border border-red-800"
+                    : selectedIncident.severity === "HIGH"
+                    ? "bg-orange-950 text-orange-300 border border-orange-800"
+                    : "bg-blue-950 text-blue-300 border border-blue-800"
+                }`}
+              >
+                {selectedIncident.severity}
+              </span>
+
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 uppercase">
+                {selectedIncident.status}
+              </span>
+            </div>
+
+            {/* Required Capabilities Pills */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] uppercase font-mono text-slate-400 font-semibold">
+                Required Capabilities:
+              </span>
+              {requiredCaps.length > 0 ? (
+                requiredCaps.map((c, i) => (
+                  <span
+                    key={i}
+                    className="text-[10px] bg-blue-950/70 border border-blue-800 text-blue-300 px-2 py-0.5 rounded font-mono font-medium"
+                  >
+                    {c.replace(/_/g, " ")}
+                  </span>
+                ))
+              ) : (
+                <span className="text-[10px] text-slate-500 italic">General Emergency Response</span>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Manual Override Drawer */}
-      {showOverride && (
-        <form onSubmit={handleManualOverride} className="card p-5 border-amber-800/80 bg-amber-950/20 space-y-4">
-          <div className="flex items-center justify-between border-b border-amber-900/60 pb-2">
-            <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
-              <span>⚠️</span> Commander Manual Override Dispatch
-            </h3>
-            <span className="text-[10px] text-amber-400 font-mono">Mandatory Audit Logged</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300">Select Available Resource *</label>
-              <select
-                required
-                value={overrideResourceId}
-                onChange={(e) => setOverrideResourceId(e.target.value)}
-                className="input-base text-xs w-full bg-slate-950"
-              >
-                <option value="">-- Choose Resource --</option>
-                {resources.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name} ({r.type}) — {r.agency.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300">Override Rationale / Justification *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Tactical proximity override approved by Incident Commander..."
-                value={overrideReason}
-                onChange={(e) => setOverrideReason(e.target.value)}
-                className="input-base text-xs w-full bg-slate-950"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowOverride(false)}
-              className="btn-secondary text-xs"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={processingId === "manual"}
-              className="btn-primary text-xs bg-amber-600 hover:bg-amber-500"
-            >
-              {processingId === "manual" ? "Executing..." : "Authorize Manual Dispatch"}
-            </button>
-          </div>
-        </form>
+      {/* Commander Manual Override Drawer */}
+      {showOverride && selectedIncident && (
+        <CommanderOverrideDrawer
+          incidentId={selectedIncident.id}
+          incidentTitle={selectedIncident.title}
+          resources={resources}
+          isOpen={showOverride}
+          onClose={() => setShowOverride(false)}
+          onSuccess={handleOverrideSuccess}
+        />
       )}
 
-      {/* Recommendations Feed */}
+      {/* Recommendations Feed Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-            <span>🤖</span> Ranked Candidate Recommendations ({recommendations.length})
-          </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🤖</span>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+              Ranked Candidate Recommendations ({recommendations.length})
+            </h2>
+          </div>
+
           <button
-            onClick={() => fetchRecommendations(selectedIncidentId)}
-            disabled={recommending}
-            className="btn-secondary text-xs flex items-center gap-1.5"
+            onClick={() => selectedIncidentId && fetchRecommendations(selectedIncidentId, true)}
+            disabled={recommending || isRefreshing}
+            className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-1.5"
           >
-            <span>🔄</span> {recommending ? "Recalculating..." : "Recalculate AI Match"}
+            <RotateCcw size={13} className={recommending ? "animate-spin text-blue-400" : ""} />
+            <span>{recommending ? "Recalculating Match Matrix..." : "Recalculate AI Match"}</span>
           </button>
         </div>
 
-        {recommending ? (
+        {loading || recommending ? (
           <div className="card p-12 text-center text-slate-400 space-y-3 flex flex-col items-center justify-center">
-            <div className="animate-spin text-3xl">⚙️</div>
-            <p className="text-sm">Analyzing capability matrix, ETA, and real-time fleet telemetry...</p>
+            <LoadingState label="Evaluating capability matrix, route ETAs, and real-time fleet telemetry..." />
           </div>
         ) : recommendations.length === 0 ? (
-          <div className="card p-12 text-center text-slate-500 space-y-3">
-            <div className="text-4xl">🛡️</div>
-            <h3 className="text-base font-semibold text-slate-300">No candidate units found</h3>
-            <p className="text-xs max-w-sm mx-auto">
-              All capable units may currently be dispatched. Use manual override or free up returning units.
-            </p>
+          <div className="card p-12 text-center border-slate-800 bg-slate-900/40">
+            <EmptyState
+              icon={Shield}
+              title="No Eligible Candidate Units Available"
+              description="All units with required capabilities are either currently deployed or out of service. Review the Eligibility Audit below or execute a Commander Manual Override."
+              action={{
+                label: "Open Commander Override",
+                onClick: () => setShowOverride(true),
+              }}
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {recommendations.map((rec, rank) => {
-              let reasonsArr: string[] = [];
-              try {
-                reasonsArr = JSON.parse(rec.reasons);
-              } catch {
-                if (rec.reasons) reasonsArr = [rec.reasons];
-              }
-
-              const scorePct = Math.round(rec.score * 100);
-              const isTopPick = rank === 0;
-
-              return (
-                <div
-                  key={rec.id}
-                  className={`card p-5 transition-all duration-200 ${
-                    isTopPick
-                      ? "border-purple-600/80 bg-purple-950/15 shadow-lg shadow-purple-950/40 ring-1 ring-purple-600/40"
-                      : "border-slate-800 hover:border-slate-700"
-                  }`}
-                >
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                    {/* Left: Unit Info & Reasons */}
-                    <div className="space-y-3 flex-1">
-                      <div className="flex flex-wrap items-center gap-3">
-                        {isTopPick && (
-                          <span className="text-[10px] font-bold bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            ★ Primary AI Pick
-                          </span>
-                        )}
-                        <h3 className="text-base font-bold text-slate-100">{rec.resource.name}</h3>
-                        <span className="badge-neutral text-[11px] px-2 py-0.5 rounded font-mono">
-                          {rec.resource.type}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          Agency: <strong className="text-slate-200">{rec.resource.agency.name}</strong>
-                        </span>
-                      </div>
-
-                      {/* Reasons tags */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {reasonsArr.map((r, i) => (
-                          <span
-                            key={i}
-                            className="text-xs bg-slate-900 border border-slate-800 text-emerald-400 px-2.5 py-1 rounded flex items-center gap-1 font-mono"
-                          >
-                            ✓ {r}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* Distance & ETA */}
-                      <div className="flex items-center gap-5 text-xs text-slate-400 font-mono">
-                        {rec.etaMinutes !== null && (
-                          <span>
-                            ⏱️ Estimated ETA: <strong className="text-slate-200">{rec.etaMinutes} mins</strong>
-                          </span>
-                        )}
-                        {rec.distanceKm !== null && (
-                          <span>
-                            📏 Route Distance: <strong className="text-slate-200">{rec.distanceKm} km</strong>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right: Score Gauge & Action Buttons */}
-                    <div className="flex items-center gap-6 border-t lg:border-t-0 pt-4 lg:pt-0 border-slate-800">
-                      <div className="text-center">
-                        <div className="text-2xl font-black text-purple-400 font-mono">{scorePct}%</div>
-                        <div className="text-[10px] uppercase font-mono text-slate-500 tracking-wider">
-                          Match Score
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-center gap-2">
-                        <button
-                          onClick={() => setRejectRecId(rec.id)}
-                          disabled={processingId === rec.id}
-                          className="btn-secondary text-xs py-2 px-3 hover:border-red-600 hover:text-red-400"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          onClick={() => handleApprove(rec.id, rec.resourceId)}
-                          disabled={processingId === rec.id}
-                          className="btn-primary text-xs py-2 px-4 shadow-md shadow-blue-600/30"
-                        >
-                          {processingId === rec.id ? "Deploying..." : "✓ Approve & Dispatch"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {recommendations.map((rec, rank) => (
+              <DispatchRecommendationCard
+                key={rec.id}
+                recommendation={rec}
+                rank={rank}
+                onApprove={handleOpenApprove}
+                onReject={handleOpenReject}
+                isProcessing={false}
+              />
+            ))}
           </div>
+        )}
+
+        {/* Fleet Eligibility Hard Filter Audit */}
+        {selectedIncident && (
+          <EligibilityAuditDrawer
+            ineligibleUnits={ineligibleUnits}
+            requiredCapabilities={requiredCaps}
+          />
         )}
       </div>
 
-      {/* Reject Modal */}
-      {rejectRecId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="card max-w-md w-full p-6 space-y-4 border-slate-700 bg-slate-900 shadow-2xl">
-            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider flex items-center gap-2">
-              <span>🚫</span> Reason for Rejecting Recommendation
-            </h3>
-            <p className="text-xs text-slate-400">
-              CrisisOS records all AI recommendation rejections in the compliance audit trail for accountability and model retraining.
-            </p>
-            <textarea
-              rows={3}
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              className="input-base text-xs w-full bg-slate-950"
-              placeholder="Specify rejection rationale..."
-            />
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <button
-                onClick={() => setRejectRecId(null)}
-                className="btn-secondary text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReject}
-                className="btn-primary text-xs bg-red-600 hover:bg-red-500"
-              >
-                Confirm Rejection
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Human Approval Confirmation Modal */}
+      {selectedIncident && (
+        <DispatchApprovalModal
+          recommendation={approvalRec}
+          incidentTitle={selectedIncident.title}
+          incidentSeverity={selectedIncident.severity}
+          isOpen={isApprovalOpen}
+          onClose={() => {
+            setIsApprovalOpen(false);
+            setApprovalRec(null);
+          }}
+          onSuccess={handleApprovalSuccess}
+        />
       )}
+
+      {/* Human Rejection Modal */}
+      <DispatchRejectionModal
+        recommendation={rejectRec}
+        isOpen={isRejectOpen}
+        onClose={() => {
+          setIsRejectOpen(false);
+          setRejectRec(null);
+        }}
+        onSuccess={handleRejectionSuccess}
+      />
     </div>
   );
 }
 
 export default function DispatchPage() {
   return (
-    <Suspense fallback={<div className="card p-12 text-center text-slate-400">Loading dispatch studio...</div>}>
+    <Suspense
+      fallback={
+        <div className="card p-12 text-center text-slate-400 flex flex-col items-center justify-center">
+          <LoadingState label="Loading RapidAid Dispatch Studio..." />
+        </div>
+      }
+    >
       <DispatchContent />
     </Suspense>
   );

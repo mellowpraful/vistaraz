@@ -32,6 +32,19 @@ export interface IncidentForMatching {
   requiredCapabilities: string | null;
 }
 
+export interface ScoreFactor {
+  factor: string;
+  impact: number;
+  description: string;
+  category: "base" | "capability" | "proximity" | "eta" | "reliability" | "workload" | "status" | "urgency";
+}
+
+export interface ScoreBreakdown {
+  baseScore: number;
+  totalScore: number;
+  factors: ScoreFactor[];
+}
+
 export interface MatchResult {
   resource: ResourceForMatching;
   rank: number;
@@ -42,6 +55,13 @@ export interface MatchResult {
   missingCapabilities: string[];
   reasons: string[];
   constraints: string[];
+  scoreBreakdown: ScoreBreakdown;
+}
+
+export interface IneligibleResource {
+  resource: ResourceForMatching;
+  reasons: string[];
+  missingCapabilities: string[];
 }
 
 // Haversine distance formula
@@ -132,38 +152,124 @@ function scoreResource(
   matched: string[],
   missing: string[],
   severity: string
-): number {
+): { score: number; breakdown: ScoreBreakdown } {
   let score = 100;
+  const factors: ScoreFactor[] = [
+    {
+      factor: "Base Allocation Score",
+      impact: 100,
+      description: "Baseline readiness candidate score",
+      category: "base",
+    },
+  ];
 
-  // Penalize missing capabilities (already filtered, but partial matches get lower scores)
-  score -= missing.length * 20;
+  // Penalize missing capabilities (if partial match mode)
+  if (missing.length > 0) {
+    const penalty = -missing.length * 20;
+    score += penalty;
+    factors.push({
+      factor: "Missing Capabilities Penalty",
+      impact: penalty,
+      description: `Missing ${missing.length} required capability (-20 pts each): ${missing.join(", ")}`,
+      category: "capability",
+    });
+  } else if (matched.length > 0) {
+    factors.push({
+      factor: "Complete Capability Match",
+      impact: 0,
+      description: `Fulfills required capabilities: ${matched.join(", ")}`,
+      category: "capability",
+    });
+  }
 
   // ETA penalty (lower ETA = better)
   if (etaMinutes !== null) {
-    score -= Math.min(etaMinutes * 0.5, 40); // max 40 point penalty
+    const etaPenalty = -Math.min(etaMinutes * 0.5, 40);
+    score += etaPenalty;
+    factors.push({
+      factor: "Travel Time (ETA) Cost",
+      impact: Number(etaPenalty.toFixed(1)),
+      description: `Estimated arrival in ${etaMinutes} min (-0.5 pts/min, max -40)`,
+      category: "eta",
+    });
   }
 
   // Distance penalty
   if (distanceKm !== null) {
-    score -= Math.min(distanceKm * 0.3, 20); // max 20 point penalty
+    const distPenalty = -Math.min(distanceKm * 0.3, 20);
+    score += distPenalty;
+    factors.push({
+      factor: "Route Distance Offset",
+      impact: Number(distPenalty.toFixed(1)),
+      description: `${distanceKm.toFixed(1)} km from incident location (-0.3 pts/km, max -20)`,
+      category: "proximity",
+    });
   }
 
   // Reliability bonus
-  score += resource.reliabilityScore * 10;
+  const relBonus = Number((resource.reliabilityScore * 10).toFixed(1));
+  score += relBonus;
+  factors.push({
+    factor: "Fleet Reliability Rating",
+    impact: relBonus,
+    description: `${(resource.reliabilityScore * 100).toFixed(0)}% verified operational reliability (+${relBonus} pts)`,
+    category: "reliability",
+  });
 
   // Workload penalty
-  score -= resource.currentWorkload * 0.1;
+  if (resource.currentWorkload > 0) {
+    const workloadPenalty = -Number((resource.currentWorkload * 0.1).toFixed(1));
+    score += workloadPenalty;
+    factors.push({
+      factor: "Active Workload Overhead",
+      impact: workloadPenalty,
+      description: `${resource.currentWorkload}% current capacity utilization (-0.1 pts/%)`,
+      category: "workload",
+    });
+  }
 
   // Status bonus
-  if (resource.status === "AVAILABLE") score += 10;
-  if (resource.status === "STANDBY") score += 5;
+  if (resource.status === "AVAILABLE") {
+    score += 10;
+    factors.push({
+      factor: "Immediate Availability Bonus",
+      impact: 10,
+      description: "Unit is AVAILABLE for immediate response (+10 pts)",
+      category: "status",
+    });
+  } else if (resource.status === "STANDBY") {
+    score += 5;
+    factors.push({
+      factor: "Standby Readiness Bonus",
+      impact: 5,
+      description: "Unit is staged on STANDBY (estimated ~5 min mobilization)",
+      category: "status",
+    });
+  }
 
   // Severity urgency bonus — for CRITICAL, prefer faster resources
   if (severity === "CRITICAL" && etaMinutes !== null) {
-    score += Math.max(0, 20 - etaMinutes);
+    const urgency = Math.max(0, 20 - etaMinutes);
+    if (urgency > 0) {
+      score += urgency;
+      factors.push({
+        factor: "Critical Urgency Transit Bonus",
+        impact: urgency,
+        description: `Rapid dispatch bonus for CRITICAL incident (${etaMinutes} min arrival)`,
+        category: "urgency",
+      });
+    }
   }
 
-  return Math.max(0, score);
+  const finalScore = Math.max(0, Number(score.toFixed(1)));
+  return {
+    score: finalScore,
+    breakdown: {
+      baseScore: 100,
+      totalScore: finalScore,
+      factors,
+    },
+  };
 }
 
 function buildReasons(
@@ -222,14 +328,14 @@ function buildConstraints(
 /**
  * Main matching function.
  * Returns ranked list of candidates. Resources with missing capabilities
- * are excluded if strict=true (default for CRITICAL/HIGH).
+ * are excluded by default (HARD ELIGIBILITY FILTER).
  */
 export function matchResources(
   incident: IncidentForMatching,
   resources: ResourceForMatching[],
   options: { strict?: boolean; maxResults?: number } = {}
 ): MatchResult[] {
-  const { strict = incident.severity === "CRITICAL" || incident.severity === "HIGH", maxResults = 5 } = options;
+  const { strict = true, maxResults = 5 } = options;
   const required = parseJsonSafe<string[]>(incident.requiredCapabilities, []);
 
   // Filter: only AVAILABLE or STANDBY resources
@@ -242,8 +348,8 @@ export function matchResources(
   for (const resource of eligible) {
     const { matched, missing } = checkCapabilityCompatibility(resource, required);
 
-    // HARD FILTER: if strict mode and there are missing capabilities, skip
-    if (strict && missing.length > 0) continue;
+    // HARD FILTER: If incident requires capabilities and resource misses any, it is ineligible
+    if (strict && required.length > 0 && missing.length > 0) continue;
 
     // Calculate distance and ETA
     let distanceKm: number | null = null;
@@ -262,7 +368,7 @@ export function matchResources(
       etaMinutes = resource.estimatedEtaMinutes;
     }
 
-    const score = scoreResource(resource, distanceKm, etaMinutes, matched, missing, incident.severity);
+    const { score, breakdown } = scoreResource(resource, distanceKm, etaMinutes, matched, missing, incident.severity);
     const reasons = buildReasons(resource, distanceKm, etaMinutes, matched, incident.severity);
     const constraints = buildConstraints(resource, missing);
 
@@ -276,6 +382,7 @@ export function matchResources(
       missingCapabilities: missing,
       reasons,
       constraints,
+      scoreBreakdown: breakdown,
     });
   }
 
@@ -285,3 +392,54 @@ export function matchResources(
   // Assign ranks and limit results
   return candidates.slice(0, maxResults).map((c, i) => ({ ...c, rank: i + 1 }));
 }
+
+/**
+ * Audit fleet eligibility for an incident, returning both eligible matches
+ * and explicit ineligibility reasons for all excluded resources.
+ */
+export function auditResourceEligibility(
+  incident: IncidentForMatching,
+  resources: ResourceForMatching[],
+  options: { strict?: boolean } = {}
+): {
+  eligible: MatchResult[];
+  ineligible: IneligibleResource[];
+} {
+  const { strict = true } = options;
+  const required = parseJsonSafe<string[]>(incident.requiredCapabilities, []);
+  const eligibleMatches = matchResources(incident, resources, { strict, maxResults: 100 });
+  const eligibleIds = new Set(eligibleMatches.map((m) => m.resource.id));
+
+  const ineligible: IneligibleResource[] = [];
+
+  for (const resource of resources) {
+    if (eligibleIds.has(resource.id)) continue;
+
+    const reasons: string[] = [];
+    const { missing } = checkCapabilityCompatibility(resource, required);
+
+    if (resource.status !== "AVAILABLE" && resource.status !== "STANDBY") {
+      reasons.push(`Ineligible status: ${resource.status.replace(/_/g, " ")}`);
+    }
+
+    if (required.length > 0 && missing.length > 0) {
+      reasons.push(`Missing required capability: ${missing.join(", ")}`);
+    }
+
+    if (reasons.length === 0) {
+      reasons.push("Excluded by capacity threshold");
+    }
+
+    ineligible.push({
+      resource,
+      reasons,
+      missingCapabilities: missing,
+    });
+  }
+
+  return {
+    eligible: eligibleMatches,
+    ineligible,
+  };
+}
+
