@@ -1,0 +1,370 @@
+// CrisisOS - Prisma Schema
+// Database: SQLite (dev) | PostgreSQL (prod) - change provider + DATABASE_URL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth & Organization ───────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         UserRole @default(OPERATOR)
+  agencyId     String?
+  agency       Agency?  @relation(fields: [agencyId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  approvals    DispatchApproval[]
+  auditLogs    AuditLog[]
+}
+
+enum UserRole {
+  ADMIN
+  COMMANDER
+  OPERATOR
+  DISPATCHER
+  FIELD
+  VIEWER
+}
+
+model Agency {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // POLICE, FIRE, MEDICAL, RESCUE, GOVERNMENT
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+
+  users     User[]
+  resources Resource[]
+  hospitals Hospital[]
+  shelters  Shelter[]
+}
+
+// ─── Incidents ─────────────────────────────────────────────────────
+
+model Incident {
+  id               String           @id @default(cuid())
+  title            String
+  description      String
+  type             IncidentType
+  severity         Severity
+  status           IncidentStatus   @default(REPORTED)
+  source           IncidentSource
+  locationName     String?
+  latitude         Float?
+  longitude        Float?
+  locationConfidence Float?         @default(0)
+  affectedCount    Int?
+  injuryCount      Int?
+  hazards          String?          // JSON array as string
+  requiredCapabilities String?      // JSON array as string
+  language         String?          @default("en")
+  originalReport   String?
+  aiExtracted      Boolean          @default(false)
+  confidence       Float?
+  duplicateOfId    String?
+  simulationId     String?          // if set, belongs to a simulation
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  reports          IncidentReport[]
+  events           IncidentEvent[]
+  assignments      ResourceAssignment[]
+  recommendations  DispatchRecommendation[]
+  duplicateOf      Incident?        @relation("Duplicates", fields: [duplicateOfId], references: [id])
+  duplicates       Incident[]       @relation("Duplicates")
+  simulation       SimulationScenario? @relation(fields: [simulationId], references: [id])
+}
+
+enum IncidentType {
+  FLOOD
+  FIRE
+  ROAD_ACCIDENT
+  INDUSTRIAL
+  MEDICAL
+  EARTHQUAKE
+  BUILDING_COLLAPSE
+  HAZMAT
+  SEARCH_RESCUE
+  OTHER
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  UNKNOWN
+}
+
+enum IncidentStatus {
+  REPORTED
+  VERIFIED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum IncidentSource {
+  EMERGENCY_CALL
+  CITIZEN_REPORT
+  SENSOR
+  FIELD_TEAM
+  HOSPITAL
+  GOVERNMENT
+  TELEGRAM
+  MANUAL
+}
+
+model IncidentReport {
+  id           String   @id @default(cuid())
+  incidentId   String
+  incident     Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  reporterName String?
+  reporterPhone String?
+  rawText      String
+  language     String?  @default("en")
+  channel      String?  // CALL, TEXT, TELEGRAM, APP
+  transcript   String?
+  imageUrls    String?  // JSON array
+  createdAt    DateTime @default(now())
+}
+
+model IncidentEvent {
+  id          String   @id @default(cuid())
+  incidentId  String
+  incident    Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  type        String   // STATUS_CHANGE, RESOURCE_ASSIGNED, NOTE, DISPATCH, etc.
+  description String
+  metadata    String?  // JSON
+  userId      String?
+  createdAt   DateTime @default(now())
+}
+
+// ─── Resources ─────────────────────────────────────────────────────
+
+model Resource {
+  id                  String           @id @default(cuid())
+  name                String
+  type                ResourceType
+  status              ResourceStatus   @default(AVAILABLE)
+  latitude            Float?
+  longitude           Float?
+  locationName        String?
+  agencyId            String?
+  agency              Agency?          @relation(fields: [agencyId], references: [id])
+  reliabilityScore    Float            @default(1.0)
+  currentWorkload     Int              @default(0)  // 0-100
+  estimatedEtaMinutes Int?
+  lastUpdated         DateTime         @updatedAt
+  createdAt           DateTime         @default(now())
+
+  capabilities        ResourceCapability[]
+  assignments         ResourceAssignment[]
+  recommendations     DispatchRecommendation[]
+}
+
+enum ResourceType {
+  AMBULANCE
+  FIRE_ENGINE
+  RESCUE_TEAM
+  POLICE_UNIT
+  MEDICAL_TEAM
+  BOAT
+  DRONE
+  RELIEF_VEHICLE
+  HELICOPTER
+  HAZMAT_UNIT
+  SEARCH_DOG_UNIT
+  SPECIALIZED
+}
+
+enum ResourceStatus {
+  AVAILABLE
+  DISPATCHED
+  EN_ROUTE
+  ON_SCENE
+  RETURNING
+  OUT_OF_SERVICE
+  STANDBY
+}
+
+model ResourceCapability {
+  id          String   @id @default(cuid())
+  resourceId  String
+  resource    Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  capability  String   // e.g. WATER_RESCUE, FIRE_SUPPRESSION, TRAUMA_CARE
+  equipment   String?  // JSON array of equipment
+}
+
+model ResourceAssignment {
+  id          String           @id @default(cuid())
+  resourceId  String
+  incidentId  String
+  resource    Resource         @relation(fields: [resourceId], references: [id])
+  incident    Incident         @relation(fields: [incidentId], references: [id])
+  status      AssignmentStatus @default(PENDING)
+  assignedAt  DateTime         @default(now())
+  arrivedAt   DateTime?
+  completedAt DateTime?
+  notes       String?
+}
+
+enum AssignmentStatus {
+  PENDING
+  EN_ROUTE
+  ON_SCENE
+  COMPLETED
+  CANCELLED
+}
+
+// ─── Dispatch ──────────────────────────────────────────────────────
+
+model DispatchRecommendation {
+  id                  String           @id @default(cuid())
+  incidentId          String
+  incident            Incident         @relation(fields: [incidentId], references: [id])
+  resourceId          String
+  resource            Resource         @relation(fields: [resourceId], references: [id])
+  rank                Int              @default(1)
+  score               Float
+  etaMinutes          Int?
+  distanceKm          Float?
+  matchedCapabilities String?          // JSON array
+  missingCapabilities String?          // JSON array
+  reasons             String           // JSON array of reason strings
+  constraints         String?          // JSON string
+  status              RecommendationStatus @default(PENDING)
+  createdAt           DateTime         @default(now())
+
+  approvals           DispatchApproval[]
+}
+
+enum RecommendationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+model DispatchApproval {
+  id               String               @id @default(cuid())
+  recommendationId String
+  recommendation   DispatchRecommendation @relation(fields: [recommendationId], references: [id])
+  userId           String
+  user             User                 @relation(fields: [userId], references: [id])
+  action           ApprovalAction
+  notes            String?
+  createdAt        DateTime             @default(now())
+}
+
+enum ApprovalAction {
+  APPROVED
+  REJECTED
+  MODIFIED
+}
+
+// ─── Infrastructure ────────────────────────────────────────────────
+
+model Hospital {
+  id            String   @id @default(cuid())
+  name          String
+  agencyId      String?
+  agency        Agency?  @relation(fields: [agencyId], references: [id])
+  latitude      Float?
+  longitude     Float?
+  address       String?
+  totalBeds     Int      @default(0)
+  availableBeds Int      @default(0)
+  icuBeds       Int      @default(0)
+  availableIcu  Int      @default(0)
+  status        String   @default("OPERATIONAL") // OPERATIONAL, REDUCED, OVERWHELMED, CLOSED
+  specialties   String?  // JSON array
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}
+
+model Shelter {
+  id          String   @id @default(cuid())
+  name        String
+  agencyId    String?
+  agency      Agency?  @relation(fields: [agencyId], references: [id])
+  latitude    Float?
+  longitude   Float?
+  address     String?
+  capacity    Int      @default(0)
+  occupied    Int      @default(0)
+  status      String   @default("OPEN") // OPEN, FULL, CLOSED
+  amenities   String?  // JSON array
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
+
+// ─── Simulation ────────────────────────────────────────────────────
+
+model SimulationScenario {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   // FLOOD, FIRE, MULTI_INCIDENT, etc.
+  config      String   // JSON config
+  status      String   @default("DRAFT") // DRAFT, RUNNING, COMPLETED, ARCHIVED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  incidents   Incident[]
+  events      SimulationEvent[]
+  recommendations AIRecommendation[]
+}
+
+model SimulationEvent {
+  id           String             @id @default(cuid())
+  scenarioId   String
+  scenario     SimulationScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  timeOffset   Int                // seconds from scenario start
+  type         String
+  description  String
+  data         String?            // JSON
+  createdAt    DateTime           @default(now())
+}
+
+// ─── AI & Intelligence ─────────────────────────────────────────────
+
+model AIRecommendation {
+  id           String              @id @default(cuid())
+  type         String              // SITUATION_SUMMARY, RESOURCE_SHORTAGE, PRIORITY, ACTION
+  content      String
+  confidence   Float?
+  reasoning    String?
+  metadata     String?             // JSON
+  scenarioId   String?
+  scenario     SimulationScenario? @relation(fields: [scenarioId], references: [id])
+  reviewed     Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+}
+
+// ─── Audit ─────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entity     String   // Incident, Resource, Dispatch, etc.
+  entityId   String?
+  before     String?  // JSON snapshot
+  after      String?  // JSON snapshot
+  metadata   String?  // JSON
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
