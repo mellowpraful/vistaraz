@@ -24,6 +24,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
+import MapWrapper from "@/components/map/MapWrapper";
 
 interface SOSCategory {
   type: string;
@@ -846,6 +847,15 @@ export default function EmergencySOSPage() {
                   </span>
                 )}
               </div>
+              
+              <div style={{ marginTop: "12px", height: "300px", width: "100%", borderRadius: "8px", overflow: "hidden" }}>
+                <MapWrapper 
+                  latitude={coords?.lat || 23.0225} 
+                  longitude={coords?.lng || 72.5714} 
+                  onChange={(lat, lng) => setCoords({ lat, lng })}
+                />
+              </div>
+
               {locError && <div style={{ fontSize: "11px", color: "#f87171", marginTop: "4px" }}>⚠️ {locError}</div>}
             </div>
 

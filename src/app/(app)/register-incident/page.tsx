@@ -19,6 +19,7 @@ import {
   LifeBuoy,
 } from "lucide-react";
 import { INCIDENT_TYPE_ICONS } from "@/lib/types";
+import MapWrapper from "@/components/map/MapWrapper";
 
 const INCIDENT_CATEGORIES = [
   { value: "FLOOD", label: "Flood / Water Inundation", icon: "🌊" },
@@ -539,6 +540,19 @@ export default function RegisterIncidentPage() {
             {fieldErrors.locationName && <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>{fieldErrors.locationName}</div>}
           </div>
 
+          <div>
+            <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-primary)", display: "block", marginBottom: "6px" }}>
+              Pinpoint Location on Map
+            </label>
+            <div style={{ height: "300px", width: "100%", marginBottom: "12px" }}>
+              <MapWrapper 
+                latitude={formData.latitude} 
+                longitude={formData.longitude} 
+                onChange={(lat, lng) => setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }))}
+              />
+            </div>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
             <div>
               <label style={{ fontSize: "11px", color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>
@@ -548,16 +562,17 @@ export default function RegisterIncidentPage() {
                 type="number"
                 step="0.0001"
                 value={formData.latitude}
-                onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })}
+                readOnly
                 style={{
                   width: "100%",
                   padding: "8px 10px",
-                  background: "var(--bg-secondary)",
+                  background: "var(--bg-card)",
                   border: "1px solid var(--border-secondary)",
                   borderRadius: "6px",
-                  color: "var(--text-primary)",
+                  color: "var(--text-muted)",
                   fontSize: "12px",
                   fontFamily: "'JetBrains Mono', monospace",
+                  cursor: "not-allowed",
                 }}
               />
             </div>
@@ -569,16 +584,17 @@ export default function RegisterIncidentPage() {
                 type="number"
                 step="0.0001"
                 value={formData.longitude}
-                onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })}
+                readOnly
                 style={{
                   width: "100%",
                   padding: "8px 10px",
-                  background: "var(--bg-secondary)",
+                  background: "var(--bg-card)",
                   border: "1px solid var(--border-secondary)",
                   borderRadius: "6px",
-                  color: "var(--text-primary)",
+                  color: "var(--text-muted)",
                   fontSize: "12px",
                   fontFamily: "'JetBrains Mono', monospace",
+                  cursor: "not-allowed",
                 }}
               />
             </div>
