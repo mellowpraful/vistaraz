@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { extractApiData, parseEquipment } from "@/lib/utils";
+import { fetchSafeJson } from "@/lib/api-client";
 import { ResourceItem, ResourceStatusModal } from "@/components/resources/ResourceStatusModal";
 import { ResourceCard } from "@/components/resources/ResourceCard";
 import { ResourceTableView } from "@/components/resources/ResourceTableView";
@@ -74,9 +75,10 @@ export default function ResourcesPage() {
     if (isManual) setIsRefreshing(true);
     setFetchError(null);
     try {
-      const res = await fetch("/api/resources");
-      if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
-      const json = await res.json();
+      const json = await fetchSafeJson<ResourceItem>("/api/resources");
+      if (!json.success) {
+        setFetchError(json.error || "Failed to fetch resource fleet data");
+      }
       const extracted = extractApiData<ResourceItem>(json);
       setResources(extracted);
       setLastRefreshed(new Date());

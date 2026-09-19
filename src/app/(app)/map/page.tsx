@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { INCIDENT_TYPE_ICONS } from "@/lib/types";
+import { fetchSafeJson } from "@/lib/api-client";
 
 // Dynamically import map component with SSR disabled
 const SituationMap = dynamic(() => import("@/components/map/SituationMap"), {
@@ -46,24 +47,17 @@ function MapViewContent() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [incRes, resRes, hospRes, sheltRes] = await Promise.all([
-        fetch("/api/incidents"),
-        fetch("/api/resources"),
-        fetch("/api/hospitals"),
-        fetch("/api/shelters"),
-      ]);
-
       const [incJson, resJson, hospJson, sheltJson] = await Promise.all([
-        incRes.json(),
-        resRes.json(),
-        hospRes.json(),
-        sheltRes.json(),
+        fetchSafeJson("/api/incidents"),
+        fetchSafeJson("/api/resources"),
+        fetchSafeJson("/api/hospitals"),
+        fetchSafeJson("/api/shelters"),
       ]);
 
-      if (incJson.success) setIncidents(incJson.data);
-      if (resJson.success) setResources(resJson.data);
-      if (hospJson.success) setHospitals(hospJson.data);
-      if (sheltJson.success) setShelters(sheltJson.data);
+      if (incJson.success && incJson.data) setIncidents(incJson.data);
+      if (resJson.success && resJson.data) setResources(resJson.data);
+      if (hospJson.success && hospJson.data) setHospitals(hospJson.data);
+      if (sheltJson.success && sheltJson.data) setShelters(sheltJson.data);
     } catch (err) {
       console.error("Map data fetch failed:", err);
     } finally {

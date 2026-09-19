@@ -5,17 +5,47 @@ import { CreateIncidentSchema } from "@/lib/types";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status");
-    const severity = searchParams.get("severity");
-    const type = searchParams.get("type");
+    const statusParam = searchParams.get("status");
+    const severityParam = searchParams.get("severity");
+    const typeParam = searchParams.get("type");
     const simulationId = searchParams.get("simulationId");
     const limit = parseInt(searchParams.get("limit") ?? "50");
 
+    let statusCondition: any = undefined;
+    if (statusParam && statusParam !== "ALL") {
+      const statuses = statusParam.split(",").map((s) => s.trim()).filter(Boolean);
+      if (statuses.length > 1) {
+        statusCondition = { in: statuses as any[] };
+      } else if (statuses.length === 1) {
+        statusCondition = statuses[0] as any;
+      }
+    }
+
+    let severityCondition: any = undefined;
+    if (severityParam && severityParam !== "ALL") {
+      const severities = severityParam.split(",").map((s) => s.trim()).filter(Boolean);
+      if (severities.length > 1) {
+        severityCondition = { in: severities as any[] };
+      } else if (severities.length === 1) {
+        severityCondition = severities[0] as any;
+      }
+    }
+
+    let typeCondition: any = undefined;
+    if (typeParam && typeParam !== "ALL") {
+      const types = typeParam.split(",").map((s) => s.trim()).filter(Boolean);
+      if (types.length > 1) {
+        typeCondition = { in: types as any[] };
+      } else if (types.length === 1) {
+        typeCondition = types[0] as any;
+      }
+    }
+
     const incidents = await prisma.incident.findMany({
       where: {
-        ...(status ? { status: status as any } : {}),
-        ...(severity ? { severity: severity as any } : {}),
-        ...(type ? { type: type as any } : {}),
+        ...(statusCondition ? { status: statusCondition } : {}),
+        ...(severityCondition ? { severity: severityCondition } : {}),
+        ...(typeCondition ? { type: typeCondition } : {}),
         simulationId: simulationId ?? null, // null = live data only
       },
       include: {
@@ -33,9 +63,12 @@ export async function GET(req: NextRequest) {
       incidents,
       total: incidents.length,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("GET /api/incidents error:", error);
-    return NextResponse.json({ success: false, error: "Failed to fetch incidents" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error?.message || "Failed to fetch incidents" },
+      { status: 500 }
+    );
   }
 }
 

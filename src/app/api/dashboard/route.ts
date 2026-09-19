@@ -47,7 +47,7 @@ export async function GET(_req: NextRequest) {
     const totalShelterCapacity = shelters.reduce((s: number, sh: any) => s + (sh.capacity ?? 0), 0);
     const shelterOccupied = shelters.reduce((s: number, sh: any) => s + (sh.occupied ?? 0), 0);
 
-    return NextResponse.json({
+    const data = {
       incidents: {
         total: Object.values(incidentCounts).reduce((s: number, n: number) => s + n, 0),
         byStatus: incidentCounts,
@@ -75,9 +75,18 @@ export async function GET(_req: NextRequest) {
       },
       pendingDispatches: recommendations,
       recentActivity: recentLogs,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data,
+      ...data,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("GET /api/dashboard error:", error);
-    return NextResponse.json({ error: "Failed to fetch dashboard data" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error?.message || "Failed to fetch dashboard data" },
+      { status: 500 }
+    );
   }
 }

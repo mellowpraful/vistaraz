@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { formatRelativeTime, extractApiData } from "@/lib/utils";
+import { fetchSafeJson } from "@/lib/api-client";
 import { INCIDENT_TYPE_ICONS } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
 import { AlertTriangle, RefreshCw, Plus, MapPin, Clock, Users, Zap, ChevronRight, Search, X } from "lucide-react";
@@ -50,6 +51,7 @@ const TYPES = [
 export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedSeverity, setSelectedSeverity] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [selectedType, setSelectedType] = useState("ALL");
@@ -78,17 +80,20 @@ export default function IncidentsPage() {
   const fetchIncidents = useCallback(async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       const params = new URLSearchParams();
       if (selectedStatus !== "ALL") params.set("status", selectedStatus);
       if (selectedSeverity !== "ALL") params.set("severity", selectedSeverity);
       if (selectedType !== "ALL") params.set("type", selectedType);
 
-      const res = await fetch(`/api/incidents?${params.toString()}`);
-      const json = await res.json();
-      // Use robust extractApiData that handles both {success, data} and legacy {incidents} shapes
+      const json = await fetchSafeJson<IncidentItem>(`/api/incidents?${params.toString()}`);
+      if (!json.success) {
+        setFetchError(json.error || "Server error while fetching incidents");
+      }
       setIncidents(extractApiData<IncidentItem>(json));
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to fetch incidents:", err);
+      setFetchError(err?.message || "Failed to fetch incidents");
     } finally {
       setLoading(false);
     }

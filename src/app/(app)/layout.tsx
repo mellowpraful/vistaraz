@@ -104,7 +104,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     };
     setUserName(nameMap[userId] ?? "Demo User");
   }, [router]);
-
   const handleRoleSwitch = (role: Role) => {
     setUserRole(role);
     localStorage.setItem("crisisos_role", role);

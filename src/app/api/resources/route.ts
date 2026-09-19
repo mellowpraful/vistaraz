@@ -4,15 +4,35 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status");
-    const type = searchParams.get("type");
+    const statusParam = searchParams.get("status");
+    const typeParam = searchParams.get("type");
     const agencyId = searchParams.get("agencyId") || searchParams.get("agency");
     const search = searchParams.get("search")?.trim();
 
+    let statusCondition: any = undefined;
+    if (statusParam && statusParam !== "ALL") {
+      const statuses = statusParam.split(",").map((s) => s.trim()).filter(Boolean);
+      if (statuses.length > 1) {
+        statusCondition = { in: statuses as any[] };
+      } else if (statuses.length === 1) {
+        statusCondition = statuses[0] as any;
+      }
+    }
+
+    let typeCondition: any = undefined;
+    if (typeParam && typeParam !== "ALL") {
+      const types = typeParam.split(",").map((s) => s.trim()).filter(Boolean);
+      if (types.length > 1) {
+        typeCondition = { in: types as any[] };
+      } else if (types.length === 1) {
+        typeCondition = types[0] as any;
+      }
+    }
+
     const resources = await prisma.resource.findMany({
       where: {
-        ...(status && status !== "ALL" ? { status: status as any } : {}),
-        ...(type && type !== "ALL" ? { type: type as any } : {}),
+        ...(statusCondition ? { status: statusCondition } : {}),
+        ...(typeCondition ? { type: typeCondition } : {}),
         ...(agencyId && agencyId !== "ALL" ? { agencyId } : {}),
         ...(search
           ? {
@@ -52,9 +72,12 @@ export async function GET(req: NextRequest) {
       resources,
       total: resources.length,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("GET /api/resources error:", error);
-    return NextResponse.json({ success: false, error: "Failed to fetch resources" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error?.message || "Failed to fetch resources" },
+      { status: 500 }
+    );
   }
 }
 
