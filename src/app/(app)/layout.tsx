@@ -23,6 +23,8 @@ import {
   Wifi,
   User,
   Bell,
+  Menu,
+  X,
 } from "lucide-react";
 
 const NAV_GROUPS = [
@@ -75,7 +77,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState<Role>("OPERATOR");
   const [collapsed, setCollapsed] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setCurrentTime(new Date());
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const userId = localStorage.getItem("crisisos_user_id");
@@ -89,11 +104,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     };
     setUserName(nameMap[userId] ?? "Demo User");
   }, [router]);
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const handleRoleSwitch = (role: Role) => {
     setUserRole(role);
@@ -111,8 +121,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-primary)" }}>
+      {/* Mobile Drawer Backdrop */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.7)",
+            backdropFilter: "blur(4px)",
+            zIndex: 95,
+          }}
+        />
+      )}
+
       {/* ── Sidebar ───────────────────────────────────────────────── */}
       <nav
+        className={`eoc-sidebar ${mobileOpen ? "mobile-open" : ""}`}
         style={{
           width: sidebarW,
           minWidth: sidebarW,
@@ -201,6 +226,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </span>
             </div>
             <div
+              suppressHydrationWarning
               style={{
                 fontSize: "11px",
                 color: "var(--text-muted)",
@@ -208,7 +234,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              {currentTime.toLocaleTimeString("en-IN", { hour12: false })}
+              {mounted && currentTime ? currentTime.toLocaleTimeString("en-IN", { hour12: false }) : "--:--:--"}
             </div>
           </div>
         )}
@@ -468,6 +494,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* ── Main Content ─────────────────────────────────────────── */}
       <div
+        className="eoc-main-content"
         style={{
           marginLeft: sidebarW,
           flex: 1,
@@ -493,8 +520,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             flexShrink: 0,
           }}
         >
-          {/* Left: breadcrumb */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {/* Left: Mobile hamburger & breadcrumb */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="mobile-nav-toggle"
+              style={{
+                background: "transparent",
+                border: "1px solid var(--border-primary)",
+                borderRadius: "6px",
+                padding: "6px",
+                color: "var(--text-primary)",
+                cursor: "pointer",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              aria-label="Toggle navigation menu"
+            >
+              {mobileOpen ? <X size={16} /> : <Menu size={16} />}
+            </button>
             <span
               style={{
                 fontSize: "12px",
@@ -551,6 +595,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Clock */}
             <div
+              suppressHydrationWarning
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -561,7 +606,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               }}
             >
               <Clock size={11} />
-              {currentTime.toLocaleTimeString("en-IN", { hour12: false })}
+              {mounted && currentTime ? currentTime.toLocaleTimeString("en-IN", { hour12: false }) : "--:--:--"}
             </div>
 
             {/* Role badge */}

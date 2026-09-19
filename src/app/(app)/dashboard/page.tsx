@@ -8,6 +8,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/Card";
 import { LoadingState, SkeletonLine } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import {
   AlertTriangle,
   Shield,
@@ -109,6 +110,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [mounted, setMounted] = useState(false);
+  const [dateString, setDateString] = useState("");
 
   const fetchDashboard = useCallback(async (isRefresh = false) => {
     try {
@@ -132,6 +135,15 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    setMounted(true);
+    setDateString(
+      new Date().toLocaleDateString("en-IN", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    );
     fetchDashboard();
     const interval = setInterval(() => fetchDashboard(), 30000);
     return () => clearInterval(interval);
@@ -228,41 +240,27 @@ export default function DashboardPage() {
           </h1>
           <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
             Gujarat Emergency Operations Center —{" "}
-            {new Date().toLocaleDateString("en-IN", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+            <span suppressHydrationWarning>
+              {mounted && dateString ? dateString : "Emergency Operations Stream"}
+            </span>
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span
+            suppressHydrationWarning
             style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}
           >
-            Updated {formatRelativeTime(lastUpdated)}
+            Updated {mounted ? formatRelativeTime(lastUpdated) : "just now"}
           </span>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => fetchDashboard(true)}
-            disabled={refreshing}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "7px 14px",
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-primary)",
-              borderRadius: "6px",
-              color: "var(--text-secondary)",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontWeight: "500",
-              transition: "all 0.15s",
-            }}
+            loading={refreshing}
+            icon={<RefreshCw size={12} />}
           >
-            <RefreshCw size={12} style={{ animation: refreshing ? "spin 0.8s linear infinite" : undefined }} />
             Refresh
-          </button>
+          </Button>
           <Link
             href="/incidents"
             style={{

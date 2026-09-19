@@ -538,3 +538,29 @@ textarea.input {
   animation: shimmer 2s infinite;
   border-radius: 4px;
 }
+
+/* ── Responsive EOC Layout ── */
+.mobile-nav-toggle {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-nav-toggle {
+    display: inline-flex !important;
+  }
+
+  .eoc-sidebar {
+    transform: translateX(-100%);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .eoc-sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  .eoc-main-content {
+    margin-left: 0 !important;
+  }
+}
+
