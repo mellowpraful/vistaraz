@@ -369,6 +369,8 @@ export const FALLBACK_HOSPITALS = [
   {
     id: "hosp-1",
     name: "Ahmedabad Civil Hospital (Asarwa)",
+    latitude: 23.0458,
+    longitude: 72.5873,
     totalBeds: 2800,
     availableBeds: 340,
     icuBeds: 180,
@@ -383,6 +385,8 @@ export const FALLBACK_HOSPITALS = [
   {
     id: "hosp-2",
     name: "Sardar Vallabhbhai Patel (SVP) Hospital",
+    latitude: 23.0228,
+    longitude: 72.5800,
     totalBeds: 1500,
     availableBeds: 220,
     icuBeds: 120,
@@ -397,6 +401,8 @@ export const FALLBACK_HOSPITALS = [
   {
     id: "hosp-3",
     name: "Apollo Hospital (Gandhinagar Highway)",
+    latitude: 23.0900,
+    longitude: 72.5900,
     totalBeds: 400,
     availableBeds: 85,
     icuBeds: 60,
@@ -411,6 +417,8 @@ export const FALLBACK_HOSPITALS = [
   {
     id: "hosp-4",
     name: "Shardaben General Hospital (Saraspur)",
+    latitude: 23.0280,
+    longitude: 72.6120,
     totalBeds: 650,
     availableBeds: 110,
     icuBeds: 40,
@@ -425,9 +433,9 @@ export const FALLBACK_HOSPITALS = [
 ];
 
 export const FALLBACK_SHELTERS = [
-  { id: "sh-1", name: "Kankaria Community Relief Shelter", capacity: 500, occupied: 320, status: "OPEN" },
-  { id: "sh-2", name: "Paldi Municipal Community Hall", capacity: 300, occupied: 140, status: "OPEN" },
-  { id: "sh-3", name: "Naroda Industrial Worker Relief Center", capacity: 400, occupied: 280, status: "OPEN" },
+  { id: "sh-1", name: "Kankaria Community Relief Shelter", latitude: 23.0050, longitude: 72.6000, capacity: 500, occupied: 320, status: "OPEN" },
+  { id: "sh-2", name: "Paldi Municipal Community Hall", latitude: 23.0150, longitude: 72.5650, capacity: 300, occupied: 140, status: "OPEN" },
+  { id: "sh-3", name: "Naroda Industrial Worker Relief Center", latitude: 23.0650, longitude: 72.6500, capacity: 400, occupied: 280, status: "OPEN" },
 ];
 
 export const FALLBACK_AUDIT_LOGS = [

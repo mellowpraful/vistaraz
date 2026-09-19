@@ -29,8 +29,10 @@ export function MetricCard({
       onMouseLeave={() => setHovered(false)}
       style={{
         background: hovered ? "var(--bg-card-hover)" : "var(--bg-card)",
-        border: `1px solid ${hovered ? color + "60" : color + "20"}`,
         borderTop: `2px solid ${color}`,
+        borderRight: `1px solid ${hovered ? color + "60" : color + "20"}`,
+        borderBottom: `1px solid ${hovered ? color + "60" : color + "20"}`,
+        borderLeft: `1px solid ${hovered ? color + "60" : color + "20"}`,
         borderRadius: "8px",
         padding: "18px",
         transition: "all 0.2s",

@@ -331,7 +331,7 @@ export default function IncidentsPage() {
       {/* Incident List */}
       {loading ? (
         <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)", borderRadius: "8px", padding: "60px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-          <div style={{ width: "36px", height: "36px", borderRadius: "50%", border: "3px solid var(--border-primary)", borderTopColor: "var(--accent-blue)", animation: "spin 0.8s linear infinite" }} />
+          <div style={{ width: "36px", height: "36px", borderRadius: "50%", borderWidth: "3px", borderStyle: "solid", borderColor: "var(--border-primary)", borderTopColor: "var(--accent-blue)", animation: "spin 0.8s linear infinite" }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>Loading incident queue...</p>
         </div>
@@ -357,7 +357,9 @@ export default function IncidentsPage() {
                 key={incident.id}
                 style={{
                   background: "var(--bg-card)",
-                  border: "1px solid var(--border-primary)",
+                  borderTop: "1px solid var(--border-primary)",
+                  borderRight: "1px solid var(--border-primary)",
+                  borderBottom: "1px solid var(--border-primary)",
                   borderLeft: `3px solid ${accentColor}`,
                   borderRadius: "8px",
                   padding: "14px 16px",

@@ -18,8 +18,12 @@ export function Card({ children, style, hover = false, accent, onClick }: CardPr
       onMouseLeave={() => hover && setHovered(false)}
       style={{
         background: hovered ? "var(--bg-card-hover)" : "var(--bg-card)",
-        border: `1px solid ${hovered ? "var(--border-secondary)" : "var(--border-primary)"}`,
-        borderLeft: accent ? `3px solid ${accent}` : undefined,
+        borderTop: `1px solid ${hovered ? "var(--border-secondary)" : "var(--border-primary)"}`,
+        borderRight: `1px solid ${hovered ? "var(--border-secondary)" : "var(--border-primary)"}`,
+        borderBottom: `1px solid ${hovered ? "var(--border-secondary)" : "var(--border-primary)"}`,
+        borderLeft: accent
+          ? `3px solid ${accent}`
+          : `1px solid ${hovered ? "var(--border-secondary)" : "var(--border-primary)"}`,
         borderRadius: "8px",
         transition: "all 0.2s",
         cursor: onClick ? "pointer" : undefined,

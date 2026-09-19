@@ -40,7 +40,9 @@ export function LoadingState({
             position: "absolute",
             inset: 0,
             borderRadius: "50%",
-            border: "2px solid #1d4ed830",
+            borderWidth: "2px",
+            borderStyle: "solid",
+            borderColor: "#1d4ed830",
             borderTopColor: "#3b82f6",
             animation: "spin 1s linear infinite",
           }}

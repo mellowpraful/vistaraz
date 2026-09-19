@@ -89,7 +89,9 @@ export function LoadingState({ label = "Loading..." }: { label?: string }) {
           width: "36px",
           height: "36px",
           borderRadius: "50%",
-          border: "3px solid var(--border-primary)",
+          borderWidth: "3px",
+          borderStyle: "solid",
+          borderColor: "var(--border-primary)",
           borderTopColor: "var(--accent-blue)",
           animation: "spin 0.8s linear infinite",
         }}

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { INCIDENT_TYPE_ICONS } from "@/lib/types";
 import { fetchSafeJson } from "@/lib/api-client";
+import { extractApiData } from "@/lib/utils";
 
 // Dynamically import map component with SSR disabled
 const SituationMap = dynamic(() => import("@/components/map/SituationMap"), {
@@ -14,7 +15,7 @@ const SituationMap = dynamic(() => import("@/components/map/SituationMap"), {
     <div className="h-full w-full flex items-center justify-center bg-slate-950 text-slate-400">
       <div className="flex flex-col items-center gap-3">
         <div className="animate-spin text-3xl">🌐</div>
-        <p className="text-xs">Initializing GIS Map Telemetry Layer...</p>
+        <p className="text-xs font-mono text-slate-400">Initializing GIS Map Telemetry Layer...</p>
       </div>
     </div>
   ),
@@ -54,10 +55,15 @@ function MapViewContent() {
         fetchSafeJson("/api/shelters"),
       ]);
 
-      if (incJson.success && incJson.data) setIncidents(incJson.data);
-      if (resJson.success && resJson.data) setResources(resJson.data);
-      if (hospJson.success && hospJson.data) setHospitals(hospJson.data);
-      if (sheltJson.success && sheltJson.data) setShelters(sheltJson.data);
+      const incData = extractApiData(incJson);
+      const resData = extractApiData(resJson);
+      const hospData = extractApiData(hospJson);
+      const sheltData = extractApiData(sheltJson);
+
+      setIncidents(incData);
+      setResources(resData);
+      setHospitals(hospData);
+      setShelters(sheltData);
     } catch (err) {
       console.error("Map data fetch failed:", err);
     } finally {
@@ -140,6 +146,15 @@ function MapViewContent() {
             />
             <span>⚠️ Danger Zones</span>
           </label>
+
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 ml-2 transition-colors disabled:opacity-50"
+            title="Refresh Map Telemetry"
+          >
+            {loading ? "⟳ Refreshing..." : "⟳ Refresh"}
+          </button>
         </div>
       </div>
 
@@ -202,7 +217,8 @@ function MapViewContent() {
                   <div className="p-2.5 bg-slate-950 rounded text-xs space-y-1 font-mono">
                     <div className="text-slate-400">📍 {selectedEntity.locationName || "Scene"}</div>
                     <div className="text-slate-500">
-                      Coordinates: {selectedEntity.latitude?.toFixed(4)}, {selectedEntity.longitude?.toFixed(4)}
+                      Coordinates: {typeof selectedEntity.latitude === "number" ? selectedEntity.latitude.toFixed(4) : "—"},{" "}
+                      {typeof selectedEntity.longitude === "number" ? selectedEntity.longitude.toFixed(4) : "—"}
                     </div>
                   </div>
 
@@ -227,7 +243,7 @@ function MapViewContent() {
                 <div className="space-y-3">
                   <div>
                     <h3 className="font-bold text-sm text-slate-100">{selectedEntity.name}</h3>
-                    <p className="text-xs text-slate-400">{selectedEntity.agency.name}</p>
+                    <p className="text-xs text-slate-400">{selectedEntity.agency?.name || "Emergency Agency"}</p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -241,7 +257,8 @@ function MapViewContent() {
 
                   <div className="p-2.5 bg-slate-950 rounded text-xs space-y-1 font-mono">
                     <div className="text-slate-500">
-                      GPS: {selectedEntity.latitude?.toFixed(4)}, {selectedEntity.longitude?.toFixed(4)}
+                      GPS: {typeof selectedEntity.latitude === "number" ? selectedEntity.latitude.toFixed(4) : "—"},{" "}
+                      {typeof selectedEntity.longitude === "number" ? selectedEntity.longitude.toFixed(4) : "—"}
                     </div>
                   </div>
                 </div>
@@ -254,12 +271,14 @@ function MapViewContent() {
                     <div className="flex justify-between">
                       <span className="text-slate-400">Available Beds:</span>
                       <strong className="text-emerald-400">
-                        {selectedEntity.availableBeds} / {selectedEntity.totalBeds}
+                        {selectedEntity.availableBeds ?? 0} / {selectedEntity.totalBeds ?? 0}
                       </strong>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">ICU Capacity:</span>
-                      <strong className="text-blue-400">{selectedEntity.icuBedsAvailable} Beds</strong>
+                      <strong className="text-blue-400">
+                        {selectedEntity.icuBedsAvailable ?? selectedEntity.availableIcu ?? 0} Beds
+                      </strong>
                     </div>
                   </div>
                   <Link href="/hospitals" className="btn-secondary text-xs w-full text-center block py-1.5">
@@ -275,7 +294,7 @@ function MapViewContent() {
                     <div className="flex justify-between">
                       <span className="text-slate-400">Current Occupancy:</span>
                       <strong className="text-amber-400">
-                        {selectedEntity.currentOccupancy} / {selectedEntity.capacity}
+                        {selectedEntity.currentOccupancy ?? selectedEntity.occupied ?? 0} / {selectedEntity.capacity ?? 0}
                       </strong>
                     </div>
                   </div>

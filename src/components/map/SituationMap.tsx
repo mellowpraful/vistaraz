@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Link from "next/link";
 import { INCIDENT_TYPE_ICONS } from "@/lib/types";
+
+// Ensure Leaflet default icon paths are resolved
+if (typeof window !== "undefined") {
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  });
+}
 
 // Custom SVG map icons
 const createCustomIcon = (emoji: string, bgColor: string) => {
@@ -22,6 +32,7 @@ const createCustomIcon = (emoji: string, bgColor: string) => {
       font-size: 16px;
       box-shadow: 0 0 10px rgba(0,0,0,0.5), 0 0 15px ${bgColor};
       border: 2px solid white;
+      cursor: pointer;
     ">${emoji}</div>`,
     iconSize: [34, 34],
     iconAnchor: [17, 17],
@@ -29,8 +40,20 @@ const createCustomIcon = (emoji: string, bgColor: string) => {
   });
 };
 
+function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [center, zoom, map]);
+  return null;
+}
+
 interface MapProps {
-  incidents: Array<{
+  incidents?: Array<{
     id: string;
     title: string;
     type: string;
@@ -42,72 +65,98 @@ interface MapProps {
     affectedCount: number | null;
     injuryCount: number | null;
   }>;
-  resources: Array<{
+  resources?: Array<{
     id: string;
     name: string;
     type: string;
     status: string;
     latitude: number | null;
     longitude: number | null;
-    agency: { name: string };
+    agency?: { name?: string };
   }>;
-  hospitals: Array<{
+  hospitals?: Array<{
     id: string;
     name: string;
-    latitude: number;
-    longitude: number;
-    availableBeds: number;
-    totalBeds: number;
-    icuBedsAvailable: number;
+    latitude?: number | null;
+    longitude?: number | null;
+    availableBeds?: number;
+    totalBeds?: number;
+    icuBedsAvailable?: number;
+    availableIcu?: number;
   }>;
-  shelters: Array<{
+  shelters?: Array<{
     id: string;
     name: string;
-    latitude: number;
-    longitude: number;
-    capacity: number;
-    currentOccupancy: number;
-    status: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    capacity?: number;
+    currentOccupancy?: number;
+    occupied?: number;
+    status?: string;
   }>;
   centerLat?: number;
   centerLng?: number;
   zoom?: number;
-  selectedEntity: any;
-  onSelectEntity: (entity: any, type: string) => void;
-  layers: {
-    incidents: boolean;
-    resources: boolean;
-    hospitals: boolean;
-    shelters: boolean;
-    hazardZones: boolean;
+  selectedEntity?: any;
+  onSelectEntity?: (entity: any, type: string) => void;
+  layers?: {
+    incidents?: boolean;
+    resources?: boolean;
+    hospitals?: boolean;
+    shelters?: boolean;
+    hazardZones?: boolean;
   };
 }
 
 export default function SituationMap({
-  incidents,
-  resources,
-  hospitals,
-  shelters,
+  incidents = [],
+  resources = [],
+  hospitals = [],
+  shelters = [],
   centerLat = 23.0225,
   centerLng = 72.5714,
   zoom = 12,
-  onSelectEntity,
+  onSelectEntity = () => {},
   layers,
 }: MapProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 0);
+    const t = setTimeout(() => setMounted(true), 10);
     return () => clearTimeout(t);
   }, []);
 
   if (!mounted) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-slate-950 text-slate-400">
-        <div className="animate-spin text-3xl">🌐</div>
+        <div className="flex flex-col items-center gap-2">
+          <div className="animate-spin text-3xl">🌐</div>
+          <span className="text-xs text-slate-500">Loading Geospatial Engine...</span>
+        </div>
       </div>
     );
   }
+
+  const safeIncidents = (incidents || []).filter(
+    (i) => i && typeof i.latitude === "number" && typeof i.longitude === "number" && !isNaN(i.latitude) && !isNaN(i.longitude)
+  );
+  const safeResources = (resources || []).filter(
+    (r) => r && typeof r.latitude === "number" && typeof r.longitude === "number" && !isNaN(r.latitude) && !isNaN(r.longitude)
+  );
+  const safeHospitals = (hospitals || []).filter(
+    (h) => h && typeof h.latitude === "number" && typeof h.longitude === "number" && !isNaN(h.latitude) && !isNaN(h.longitude)
+  );
+  const safeShelters = (shelters || []).filter(
+    (s) => s && typeof s.latitude === "number" && typeof s.longitude === "number" && !isNaN(s.latitude) && !isNaN(s.longitude)
+  );
+
+  const safeLayers = {
+    incidents: layers?.incidents ?? true,
+    resources: layers?.resources ?? true,
+    hospitals: layers?.hospitals ?? true,
+    shelters: layers?.shelters ?? true,
+    hazardZones: layers?.hazardZones ?? true,
+  };
 
   const getIncidentBg = (severity: string) => {
     switch (severity) {
@@ -128,27 +177,34 @@ export default function SituationMap({
         return "#10b981";
       case "ON_SCENE":
       case "DISPATCHED":
+      case "EN_ROUTE":
         return "#f59e0b";
       default:
         return "#64748b";
     }
   };
 
+  const validLat = typeof centerLat === "number" && !isNaN(centerLat) ? centerLat : 23.0225;
+  const validLng = typeof centerLng === "number" && !isNaN(centerLng) ? centerLng : 72.5714;
+  const validZoom = typeof zoom === "number" && !isNaN(zoom) ? zoom : 12;
+
   return (
     <MapContainer
-      center={[centerLat, centerLng]}
-      zoom={zoom}
+      center={[validLat, validLng]}
+      zoom={validZoom}
       scrollWheelZoom={true}
       className="h-full w-full rounded-xl z-0"
-      style={{ background: "#0b0f19" }}
+      style={{ background: "#0b0f19", height: "100%", width: "100%" }}
     >
+      <MapUpdater center={[validLat, validLng]} zoom={validZoom} />
+
       <TileLayer
-        attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+        attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
 
       {/* Flood / Hazard Simulation Circles */}
-      {layers.hazardZones && (
+      {safeLayers.hazardZones && (
         <>
           <Circle
             center={[23.0305, 72.5801]}
@@ -175,98 +231,94 @@ export default function SituationMap({
       )}
 
       {/* Incidents Markers */}
-      {layers.incidents &&
-        incidents
-          .filter((i) => i.latitude && i.longitude)
-          .map((inc) => {
-            const icon = createCustomIcon(
-              INCIDENT_TYPE_ICONS[inc.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨",
-              getIncidentBg(inc.severity)
-            );
+      {safeLayers.incidents &&
+        safeIncidents.map((inc) => {
+          const icon = createCustomIcon(
+            INCIDENT_TYPE_ICONS[inc.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨",
+            getIncidentBg(inc.severity)
+          );
 
-            return (
-              <Marker
-                key={`inc-${inc.id}`}
-                position={[inc.latitude!, inc.longitude!]}
-                icon={icon}
-                eventHandlers={{
-                  click: () => onSelectEntity(inc, "INCIDENT"),
-                }}
-              >
-                <Popup className="custom-popup">
-                  <div className="p-2 space-y-1.5 text-slate-900 min-w-[200px]">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-xs">{inc.title}</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">
-                        {inc.severity}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-600 line-clamp-2">
-                      📍 {inc.locationName || "Scene Location"}
-                    </p>
-                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200">
-                      <span>Status: <strong>{inc.status}</strong></span>
-                      <Link
-                        href={`/incidents/${inc.id}`}
-                        className="text-blue-600 font-bold hover:underline"
-                      >
-                        SITREP →
-                      </Link>
-                    </div>
+          return (
+            <Marker
+              key={`inc-${inc.id}`}
+              position={[inc.latitude!, inc.longitude!]}
+              icon={icon}
+              eventHandlers={{
+                click: () => onSelectEntity(inc, "INCIDENT"),
+              }}
+            >
+              <Popup className="custom-popup">
+                <div className="p-2 space-y-1.5 text-slate-900 min-w-[200px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-xs">{inc.title}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">
+                      {inc.severity}
+                    </span>
                   </div>
-                </Popup>
-              </Marker>
-            );
-          })}
+                  <p className="text-[11px] text-slate-600 line-clamp-2">
+                    📍 {inc.locationName || "Scene Location"}
+                  </p>
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200">
+                    <span>Status: <strong>{inc.status}</strong></span>
+                    <Link
+                      href={`/incidents/${inc.id}`}
+                      className="text-blue-600 font-bold hover:underline"
+                    >
+                      SITREP →
+                    </Link>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
 
       {/* Resources Markers */}
-      {layers.resources &&
-        resources
-          .filter((r) => r.latitude && r.longitude)
-          .map((res) => {
-            const icon = createCustomIcon(
-              res.type === "AMBULANCE"
-                ? "🚑"
-                : res.type === "FIRE_ENGINE"
-                ? "🚒"
-                : res.type === "BOAT"
-                ? "🚤"
-                : res.type === "DRONE"
-                ? "🚁"
-                : "🛡️",
-              getResourceBg(res.status)
-            );
+      {safeLayers.resources &&
+        safeResources.map((res) => {
+          const icon = createCustomIcon(
+            res.type === "AMBULANCE"
+              ? "🚑"
+              : res.type === "FIRE_ENGINE"
+              ? "🚒"
+              : res.type === "BOAT"
+              ? "🚤"
+              : res.type === "DRONE"
+              ? "🚁"
+              : "🛡️",
+            getResourceBg(res.status)
+          );
 
-            return (
-              <Marker
-                key={`res-${res.id}`}
-                position={[res.latitude!, res.longitude!]}
-                icon={icon}
-                eventHandlers={{
-                  click: () => onSelectEntity(res, "RESOURCE"),
-                }}
-              >
-                <Popup>
-                  <div className="p-2 space-y-1 text-slate-900 min-w-[180px]">
-                    <div className="font-bold text-xs">{res.name}</div>
-                    <div className="text-[11px] text-slate-600">{res.agency.name}</div>
-                    <div className="text-[10px] font-mono text-emerald-700 font-semibold">
-                      Status: {res.status}
-                    </div>
+          return (
+            <Marker
+              key={`res-${res.id}`}
+              position={[res.latitude!, res.longitude!]}
+              icon={icon}
+              eventHandlers={{
+                click: () => onSelectEntity(res, "RESOURCE"),
+              }}
+            >
+              <Popup>
+                <div className="p-2 space-y-1 text-slate-900 min-w-[180px]">
+                  <div className="font-bold text-xs">{res.name}</div>
+                  <div className="text-[11px] text-slate-600">{res.agency?.name || "Emergency Response Agency"}</div>
+                  <div className="text-[10px] font-mono text-emerald-700 font-semibold">
+                    Status: {res.status}
                   </div>
-                </Popup>
-              </Marker>
-            );
-          })}
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
 
       {/* Hospitals Markers */}
-      {layers.hospitals &&
-        hospitals.map((hosp) => {
+      {safeLayers.hospitals &&
+        safeHospitals.map((hosp) => {
           const icon = createCustomIcon("🏥", "#0284c7");
           return (
             <Marker
               key={`hosp-${hosp.id}`}
-              position={[hosp.latitude, hosp.longitude]}
+              position={[hosp.latitude!, hosp.longitude!]}
               icon={icon}
               eventHandlers={{
                 click: () => onSelectEntity(hosp, "HOSPITAL"),
@@ -276,7 +328,7 @@ export default function SituationMap({
                 <div className="p-2 space-y-1 text-slate-900 min-w-[180px]">
                   <div className="font-bold text-xs">{hosp.name}</div>
                   <div className="text-[11px] text-slate-700">
-                    Beds: {hosp.availableBeds}/{hosp.totalBeds} (ICU: {hosp.icuBedsAvailable})
+                    Beds: {hosp.availableBeds ?? 0}/{hosp.totalBeds ?? 0} (ICU: {hosp.icuBedsAvailable ?? hosp.availableIcu ?? 0})
                   </div>
                 </div>
               </Popup>
@@ -285,13 +337,13 @@ export default function SituationMap({
         })}
 
       {/* Shelters Markers */}
-      {layers.shelters &&
-        shelters.map((shelter) => {
+      {safeLayers.shelters &&
+        safeShelters.map((shelter) => {
           const icon = createCustomIcon("⛺", "#d97706");
           return (
             <Marker
               key={`shelt-${shelter.id}`}
-              position={[shelter.latitude, shelter.longitude]}
+              position={[shelter.latitude!, shelter.longitude!]}
               icon={icon}
               eventHandlers={{
                 click: () => onSelectEntity(shelter, "SHELTER"),
@@ -301,7 +353,7 @@ export default function SituationMap({
                 <div className="p-2 space-y-1 text-slate-900 min-w-[180px]">
                   <div className="font-bold text-xs">{shelter.name}</div>
                   <div className="text-[11px] text-slate-700">
-                    Occupancy: {shelter.currentOccupancy}/{shelter.capacity}
+                    Occupancy: {shelter.currentOccupancy ?? shelter.occupied ?? 0}/{shelter.capacity ?? 0}
                   </div>
                 </div>
               </Popup>
