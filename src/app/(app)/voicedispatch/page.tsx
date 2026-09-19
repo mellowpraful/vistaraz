@@ -3,11 +3,28 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { INCIDENT_TYPE_ICONS } from "@/lib/types";
+import { Badge } from "@/components/ui/Badge";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import {
+  Mic,
+  Phone,
+  Bot,
+  MapPin,
+  AlertTriangle,
+  Zap,
+  Users,
+  Radio,
+  Volume2,
+  ChevronRight,
+  CheckCircle,
+} from "lucide-react";
 
 interface Scenario {
   id: string;
   title: string;
+  emoji: string;
   language: string;
+  langLabel: string;
   caller: string;
   transcript: string;
   audioDuration: number;
@@ -29,9 +46,11 @@ interface Scenario {
 const PRESET_SCENARIOS: Scenario[] = [
   {
     id: "scen-1",
-    title: "🌊 Sabarmati Flash Flood Emergency (Gujarati/Hindi)",
+    title: "Sabarmati Flash Flood",
+    emoji: "🌊",
     language: "gu-IN",
-    caller: "+91 98250 XXXXX (Citizen, Usmanpura)",
+    langLabel: "Gujarati",
+    caller: "+91 98250 XXXXX — Usmanpura Citizen",
     transcript:
       "હેલો કંટ્રોલ રૂમ! સાબરમતી નદીનું પાણી ઉસ્માનપુરા રિવરફ્રન્ટ પાસે ઘૂસી ગયું છે. 30 થી વધુ લોકો એક બિલ્ડિંગની છત પર ફસાયેલા છે! બે વૃદ્ધ લોકોને ઈજા થઈ છે અને પાણી ઝડપથી વધી રહ્યું છે. તાત્કાલિક બોટ અને રેસ્ક્યુ ટીમ મોકલો!",
     audioDuration: 12,
@@ -46,14 +65,17 @@ const PRESET_SCENARIOS: Scenario[] = [
       injuryCount: 2,
       hazards: ["Fast Rising Water", "Submerged Electrical Lines", "Structural Collapse Risk"],
       requiredCapabilities: ["Water Rescue", "Inflatable Boat", "Triage Paramedic", "Evacuation"],
-      summary: "30 civilians trapped on rooftop due to surging floodwaters near Usmanpura. 2 injured elderly reported. Urgent inflatable rescue boats required.",
+      summary:
+        "30 civilians trapped on rooftop due to surging floodwaters near Usmanpura. 2 injured elderly reported. Urgent inflatable rescue boats required.",
     },
   },
   {
     id: "scen-2",
-    title: "☣️ Vatva GIDC Chemical Reactor Explosion (Hindi)",
+    title: "Vatva GIDC Chemical Blast",
+    emoji: "☣️",
     language: "hi-IN",
-    caller: "+91 94280 XXXXX (Plant Supervisor)",
+    langLabel: "Hindi",
+    caller: "+91 94280 XXXXX — Plant Supervisor",
     transcript:
       "इमरजेंसी! वटवा GIDC फेज़ 4 में केमिकल रिएक्टर में भीषण ब्लास्ट हुआ है। जहरीली क्लोरीन गैस का रिसाव हो रहा है और आसपास की फैक्ट्री में आग फैल रही है। 15 वर्कर्स अंदर फंसे हैं और सांस लेने में दिक्कत हो रही है। तुरंत हैज़मैट और एडवांस एम्बुलेंस भेजिए!",
     audioDuration: 14,
@@ -68,14 +90,17 @@ const PRESET_SCENARIOS: Scenario[] = [
       injuryCount: 15,
       hazards: ["Toxic Chlorine Cloud", "Secondary Explosion Risk", "Corrosive Chemical Spill"],
       requiredCapabilities: ["Hazmat Containment", "Chemical Suits Level A", "Advanced Life Support", "Heavy Foam Pumper"],
-      summary: "Chemical reactor exploded releasing toxic chlorine gas cloud in industrial zone. 15 workers suffering acute respiratory distress. Hazmat containment and heavy foam suppression needed.",
+      summary:
+        "Chemical reactor exploded releasing toxic chlorine gas cloud in industrial zone. 15 workers suffering acute respiratory distress. Hazmat containment and heavy foam suppression needed.",
     },
   },
   {
     id: "scen-3",
-    title: "🚗 SG Highway Multi-Vehicle Pileup (English)",
+    title: "SG Highway Mass Casualty",
+    emoji: "🚗",
     language: "en-IN",
-    caller: "+91 99090 XXXXX (Highway Patrol)",
+    langLabel: "English",
+    caller: "+91 99090 XXXXX — Highway Patrol 04",
     transcript:
       "Control, this is Highway Patrol 04. We have a severe 5-vehicle pileup under the Iskcon Flyover on SG Highway. A commercial tanker collided with two sedans and a passenger bus. At least 8 trapped passengers with severe trauma injuries. Traffic is blocked in both directions.",
     audioDuration: 10,
@@ -90,7 +115,8 @@ const PRESET_SCENARIOS: Scenario[] = [
       injuryCount: 8,
       hazards: ["Fuel Leakage", "Trapped In Occupants", "Highway Gridlock"],
       requiredCapabilities: ["Hydraulic Cutters / Extrication", "Trauma Ambulance", "Traffic Control", "Heavy Towing Crane"],
-      summary: "Major 5-vehicle crash involving bus and tanker on SG Highway. 8 injured with hydraulic extrication required. Heavy traffic block.",
+      summary:
+        "Major 5-vehicle crash involving bus and tanker on SG Highway. 8 injured with hydraulic extrication required. Heavy traffic block.",
     },
   },
 ];
@@ -99,12 +125,14 @@ export default function VoiceDispatchPage() {
   const router = useRouter();
   const [activeScenario, setActiveScenario] = useState<Scenario>(PRESET_SCENARIOS[0]);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [callProgress, setCallProgress] = useState(0); // 0 to 100
+  const [callProgress, setCallProgress] = useState(0);
   const [typedTranscript, setTypedTranscript] = useState("");
   const [aiConfidence, setAiConfidence] = useState(0);
   const [creating, setCreating] = useState(false);
+  const [waveHeights, setWaveHeights] = useState<number[]>(Array(36).fill(8));
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const waveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const startCallSimulation = (scen: Scenario) => {
     setActiveScenario(scen);
@@ -114,6 +142,7 @@ export default function VoiceDispatchPage() {
     setAiConfidence(0);
 
     if (timerRef.current) clearInterval(timerRef.current);
+    if (waveTimerRef.current) clearInterval(waveTimerRef.current);
 
     const totalSteps = 40;
     const stepDuration = (scen.audioDuration * 1000) / totalSteps;
@@ -123,25 +152,36 @@ export default function VoiceDispatchPage() {
       currentStep++;
       const progress = Math.min(100, Math.round((currentStep / totalSteps) * 100));
       setCallProgress(progress);
-
-      // Typing effect
       const charIndex = Math.round((progress / 100) * scen.transcript.length);
       setTypedTranscript(scen.transcript.slice(0, charIndex));
-
-      // AI confidence ramp
       setAiConfidence(Math.min(96, Math.round(progress * 0.96)));
 
       if (currentStep >= totalSteps) {
         if (timerRef.current) clearInterval(timerRef.current);
         setIsPlaying(false);
+        if (waveTimerRef.current) clearInterval(waveTimerRef.current);
+        setWaveHeights(Array(36).fill(4));
       }
     }, stepDuration);
+
+    // Animate waveform
+    waveTimerRef.current = setInterval(() => {
+      setWaveHeights(
+        Array(36)
+          .fill(0)
+          .map((_, i) => Math.max(4, Math.abs(Math.sin((i + Date.now() / 200) * 0.7)) * 70 + Math.random() * 30))
+      );
+    }, 100);
   };
 
   useEffect(() => {
-    startCallSimulation(PRESET_SCENARIOS[0]);
+    const initTimer = setTimeout(() => {
+      startCallSimulation(PRESET_SCENARIOS[0]);
+    }, 0);
     return () => {
+      clearTimeout(initTimer);
       if (timerRef.current) clearInterval(timerRef.current);
+      if (waveTimerRef.current) clearInterval(waveTimerRef.current);
     };
   }, []);
 
@@ -171,7 +211,6 @@ export default function VoiceDispatchPage() {
           confidence: aiConfidence / 100,
         }),
       });
-
       const json = await res.json();
       if (json.success && json.data) {
         router.push(`/dispatch?incidentId=${json.data.id}`);
@@ -183,238 +222,335 @@ export default function VoiceDispatchPage() {
     }
   };
 
+  const ext = activeScenario.extracted;
+  const isComplete = callProgress >= 100;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      {/* ── Header ───────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100 flex items-center gap-3">
-            <span>🎙️</span> VoiceDispatch 911 / Citizen Voice Console
+          <h1 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
+            <Mic size={20} color="#3b82f6" />
+            VoiceDispatch 911 Console
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
             Multilingual emergency speech stream processing with real-time AI entity extraction and triage automation
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <span className="badge-critical text-xs px-3 py-1 rounded-full font-mono flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
-            LIVE TELECOM INTAKE
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: "20px" }}>
+            <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#ef4444", animation: "live-pulse 1s infinite" }} />
+            <span style={{ fontSize: "11px", fontWeight: "700", color: "#f87171", letterSpacing: "1px" }}>LIVE TELECOM INTAKE</span>
+          </div>
         </div>
       </div>
 
-      {/* Scenario Selector Bar */}
-      <div className="card p-4 space-y-2 bg-slate-900 border-slate-800">
-        <span className="text-xs font-bold uppercase font-mono text-slate-400">
-          Simulate Incoming Emergency Call:
-        </span>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-          {PRESET_SCENARIOS.map((scen) => (
-            <button
-              key={scen.id}
-              onClick={() => startCallSimulation(scen)}
-              className={`p-3 text-left rounded-lg border transition-all text-xs space-y-1 ${
-                activeScenario.id === scen.id
-                  ? "bg-purple-950/40 border-purple-500 shadow-md shadow-purple-950/50"
-                  : "bg-slate-950 border-slate-800 hover:border-slate-700"
-              }`}
-            >
-              <div className="font-bold text-slate-200">{scen.title}</div>
-              <div className="text-slate-400 text-[11px] flex items-center justify-between">
-                <span>🗣️ {scen.language}</span>
-                <span className="font-mono text-slate-500">{scen.caller}</span>
-              </div>
-            </button>
-          ))}
+      {/* ── Scenario Selector ─────────────────────────────────────── */}
+      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)", borderRadius: "8px", padding: "14px 16px" }}>
+        <div style={{ fontSize: "10px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "10px" }}>
+          Simulate Incoming Emergency Call
         </div>
-      </div>
-
-      {/* Main Split: Audio Stream Left vs AI Structured Extraction Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: Live Audio Frequency & Speech Stream */}
-        <div className="card p-6 space-y-5 border-slate-800 bg-slate-900/90 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">📞</span>
-                <div>
-                  <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    Incoming Audio Stream
-                  </div>
-                  <div className="text-[11px] text-slate-400 font-mono">{activeScenario.caller}</div>
-                </div>
-              </div>
-
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
-                  isPlaying
-                    ? "bg-emerald-950 text-emerald-300 border border-emerald-800 animate-pulse"
-                    : "bg-slate-800 text-slate-400"
-                }`}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+          {PRESET_SCENARIOS.map((scen) => {
+            const isActive = activeScenario.id === scen.id;
+            return (
+              <button
+                key={scen.id}
+                onClick={() => startCallSimulation(scen)}
+                style={{
+                  padding: "12px",
+                  textAlign: "left",
+                  borderRadius: "8px",
+                  border: `1px solid ${isActive ? "#6b21a8" : "var(--border-primary)"}`,
+                  background: isActive ? "#1a0b2e" : "var(--bg-secondary)",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-secondary)"; }}
+                onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-primary)"; }}
               >
-                {isPlaying ? "STREAMING (LIVE)" : "CALL COMPLETED"}
-              </span>
+                <div style={{ fontSize: "18px", marginBottom: "4px" }}>{scen.emoji}</div>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: isActive ? "#e9d5ff" : "var(--text-primary)", marginBottom: "4px" }}>{scen.title}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "10px", color: isActive ? "#c084fc" : "var(--text-muted)", fontWeight: "600" }}>{scen.langLabel}</span>
+                  <span style={{ fontSize: "9px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{scen.audioDuration}s</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Main 2-Column Console ──────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+
+        {/* LEFT: Audio Stream Panel */}
+        <Card style={{ borderColor: "#1d4ed820" }}>
+          <CardHeader>
+            <CardTitle>
+              <Phone size={14} color="#60a5fa" />
+              Incoming Audio Stream
+            </CardTitle>
+            <div style={{
+              padding: "3px 10px", borderRadius: "4px",
+              background: isPlaying ? "#052e16" : "#111827",
+              border: `1px solid ${isPlaying ? "#14532d" : "var(--border-primary)"}`,
+              color: isPlaying ? "#4ade80" : "var(--text-muted)",
+              fontSize: "9px", fontWeight: "700", letterSpacing: "1px",
+              animation: isPlaying ? "pulse-critical 2s ease-in-out infinite" : undefined,
+            }}>
+              {isPlaying ? "STREAMING LIVE" : isComplete ? "CALL COMPLETED" : "STANDBY"}
+            </div>
+          </CardHeader>
+
+          <CardContent style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {/* Caller info */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)" }}>
+              <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#1e3a5f", border: "1px solid #1d4ed8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Phone size={14} color="#60a5fa" />
+              </div>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-primary)" }}>{activeScenario.caller}</div>
+                <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Lang: {activeScenario.langLabel} · {activeScenario.language}</div>
+              </div>
             </div>
 
-            {/* Oscillating Audio Waveform Canvas / Bars */}
-            <div className="h-28 bg-slate-950 rounded-xl border border-slate-800 p-4 flex items-center justify-center gap-1.5 overflow-hidden">
-              {[...Array(32)].map((_, i) => {
-                const height = isPlaying
-                  ? Math.max(15, Math.sin((i + callProgress) * 0.5) * 80 + Math.random() * 20)
-                  : 8;
-                return (
-                  <div
-                    key={i}
-                    style={{ height: `${height}%` }}
-                    className={`w-1.5 rounded-full transition-all duration-100 ${
-                      isPlaying
-                        ? "bg-gradient-to-t from-blue-600 via-purple-500 to-red-400 shadow-sm shadow-purple-500/50"
-                        : "bg-slate-800"
-                    }`}
-                  />
-                );
-              })}
+            {/* Waveform Visualizer */}
+            <div
+              style={{
+                height: "80px",
+                background: "#050810",
+                borderRadius: "8px",
+                border: "1px solid var(--border-primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "3px",
+                padding: "8px 12px",
+                overflow: "hidden",
+              }}
+            >
+              {waveHeights.map((h, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: "3px",
+                    height: `${h}%`,
+                    borderRadius: "2px",
+                    flexShrink: 0,
+                    transition: "height 0.1s ease-out",
+                    background: isPlaying
+                      ? `hsl(${220 + i * 3}, 80%, ${50 + h * 0.3}%)`
+                      : "var(--border-secondary)",
+                    boxShadow: isPlaying ? `0 0 4px hsl(${220 + i * 3}, 80%, 50%)` : "none",
+                  }}
+                />
+              ))}
             </div>
 
-            {/* Progress indicator */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-mono text-slate-400">
-                <span>Live Speech Processing</span>
+            {/* Progress bar */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px", fontSize: "10px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                  <Volume2 size={10} /> Speech Processing
+                </div>
                 <span>{callProgress}%</span>
               </div>
-              <div className="h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+              <div style={{ height: "4px", background: "var(--bg-elevated)", borderRadius: "2px", overflow: "hidden" }}>
                 <div
-                  style={{ width: `${callProgress}%` }}
-                  className="h-full bg-purple-500 transition-all duration-150"
+                  style={{
+                    height: "100%",
+                    width: `${callProgress}%`,
+                    background: "linear-gradient(90deg, #3b82f6, #c084fc)",
+                    borderRadius: "2px",
+                    transition: "width 0.15s ease-out",
+                  }}
                 />
               </div>
             </div>
 
-            {/* Live Typewriter Transcript */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-                <span>Real-Time Speech-to-Text Stream:</span>
-                <span className="font-mono text-purple-400">Lang: {activeScenario.language}</span>
+            {/* Live Transcript */}
+            <div>
+              <div style={{ fontSize: "10px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
+                <Radio size={10} /> Real-Time Speech-to-Text
               </div>
-              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 min-h-[120px] text-sm text-slate-200 font-mono leading-relaxed">
+              <div
+                style={{
+                  padding: "12px",
+                  background: "#050810",
+                  border: "1px solid var(--border-primary)",
+                  borderRadius: "8px",
+                  minHeight: "100px",
+                  fontSize: "13px",
+                  color: "var(--text-primary)",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  lineHeight: "1.6",
+                }}
+              >
                 {typedTranscript || (
-                  <span className="text-slate-600 italic">Listening for emergency audio input...</span>
+                  <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Listening for emergency audio input...</span>
                 )}
-                {isPlaying && <span className="inline-block w-2 h-4 bg-purple-400 ml-1 animate-pulse" />}
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>Audio Codec: OPUS 48kHz HD</span>
-            <span>Latency: 84ms</span>
-          </div>
-        </div>
-
-        {/* Right Column: AI Extraction & Triage Preview */}
-        <div className="card p-6 space-y-5 border-purple-900/60 bg-slate-900/90 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🤖</span>
-                <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
-                  Real-Time AI Incident Extraction
-                </h3>
-              </div>
-              <div className="text-right">
-                <div className="text-xs font-bold text-purple-400 font-mono">
-                  {aiConfidence}% Confidence
-                </div>
+                {isPlaying && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: "2px",
+                      height: "14px",
+                      background: "#c084fc",
+                      marginLeft: "2px",
+                      verticalAlign: "middle",
+                      animation: "pulse-critical 0.7s ease-in-out infinite",
+                    }}
+                  />
+                )}
               </div>
             </div>
 
-            {/* Extracted Structured Card */}
-            <div className="space-y-3">
-              <div className="p-3.5 bg-slate-950 rounded-lg border border-slate-800 space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-mono">Generated Incident Title</span>
-                <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                  <span>{INCIDENT_TYPE_ICONS[activeScenario.extracted.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨"}</span>
-                  {activeScenario.extracted.title}
-                </div>
+            {/* Audio metadata */}
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", borderTop: "1px solid var(--border-primary)", paddingTop: "10px" }}>
+              <span>Codec: OPUS 48kHz HD</span>
+              <span>Latency: 84ms</span>
+              <span>Duration: {activeScenario.audioDuration}s</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* RIGHT: AI Extraction Panel */}
+        <Card style={{ borderColor: "#6b21a820" }}>
+          <CardHeader>
+            <CardTitle>
+              <Bot size={14} color="#c084fc" />
+              AI Incident Extraction
+            </CardTitle>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: "18px", fontWeight: "800", color: "#c084fc", letterSpacing: "-0.5px", lineHeight: "1" }}>
+                {aiConfidence}%
               </div>
+              <div style={{ fontSize: "9px", color: "var(--text-muted)", fontWeight: "600" }}>AI CONFIDENCE</div>
+            </div>
+          </CardHeader>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-center">
-                  <div className="text-[10px] text-slate-500 uppercase font-mono">Type</div>
-                  <div className="text-xs font-bold text-blue-400 mt-0.5">{activeScenario.extracted.type}</div>
-                </div>
+          <CardContent style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {/* Confidence bar */}
+            <div style={{ height: "3px", background: "var(--bg-elevated)", borderRadius: "2px", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${aiConfidence}%`, background: "linear-gradient(90deg, #7c3aed, #c084fc)", borderRadius: "2px", transition: "width 0.3s ease-out" }} />
+            </div>
 
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-center">
-                  <div className="text-[10px] text-slate-500 uppercase font-mono">Severity</div>
-                  <div className="text-xs font-bold text-red-400 mt-0.5">{activeScenario.extracted.severity}</div>
-                </div>
-
-                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-center col-span-2 sm:col-span-1">
-                  <div className="text-[10px] text-slate-500 uppercase font-mono">Casualties / Injured</div>
-                  <div className="text-xs font-bold text-amber-400 mt-0.5">
-                    {activeScenario.extracted.affectedCount} Aff / {activeScenario.extracted.injuryCount} Inj
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-mono">Geocoded Location</span>
-                <div className="text-xs text-slate-200">📍 {activeScenario.extracted.locationName}</div>
-                <div className="text-[10px] text-slate-500 font-mono">
-                  GPS: {activeScenario.extracted.latitude}, {activeScenario.extracted.longitude}
-                </div>
-              </div>
-
-              {/* Hazards Identified */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] text-slate-400 font-mono uppercase">Flagged Environmental Hazards:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {activeScenario.extracted.hazards.map((h, i) => (
-                    <span
-                      key={i}
-                      className="text-xs bg-red-950/70 text-red-300 border border-red-900 px-2 py-0.5 rounded"
-                    >
-                      ⚠️ {h}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Capabilities needed */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] text-slate-400 font-mono uppercase">Recommended Response Capabilities:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {activeScenario.extracted.requiredCapabilities.map((c, i) => (
-                    <span
-                      key={i}
-                      className="text-xs bg-blue-950/70 text-blue-300 border border-blue-900 px-2 py-0.5 rounded"
-                    >
-                      🎯 {c}
-                    </span>
-                  ))}
-                </div>
+            {/* Extracted incident title */}
+            <div style={{ padding: "12px", background: "var(--bg-secondary)", border: "1px solid #6b21a820", borderRadius: "8px" }}>
+              <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "6px" }}>Extracted Incident</div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                <span style={{ fontSize: "20px", flexShrink: 0 }}>
+                  {INCIDENT_TYPE_ICONS[ext.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨"}
+                </span>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-primary)", lineHeight: "1.4" }}>{ext.title}</div>
               </div>
             </div>
-          </div>
 
-          {/* Action Dispatch Button */}
-          <div className="pt-4 border-t border-slate-800">
-            <button
-              onClick={handleDispatchIncident}
-              disabled={creating || callProgress < 50}
-              className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 disabled:opacity-50"
-            >
-              {creating ? (
-                "Registering Incident & Opening Dispatch..."
-              ) : (
-                <>
-                  <span>🚨</span> Authorize Incident & Match Responders
-                </>
+            {/* Key metrics grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+              <div style={{ padding: "10px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)", textAlign: "center" }}>
+                <div style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Type</div>
+                <span style={{ fontSize: "11px", fontWeight: "700", color: "#60a5fa", background: "#1e3a5f", border: "1px solid #1d4ed8", padding: "2px 8px", borderRadius: "4px" }}>
+                  {ext.type.replace(/_/g, " ")}
+                </span>
+              </div>
+              <div style={{ padding: "10px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)", textAlign: "center" }}>
+                <div style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Severity</div>
+                <Badge variant={ext.severity as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW"} dot pulse={ext.severity === "CRITICAL"}>
+                  {ext.severity}
+                </Badge>
+              </div>
+              <div style={{ padding: "10px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)", textAlign: "center" }}>
+                <div style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Casualties</div>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: "#f87171" }}>{ext.affectedCount} / {ext.injuryCount}inj</div>
+              </div>
+            </div>
+
+            {/* Location */}
+            <div style={{ padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)" }}>
+              <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Geocoded Location</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-primary)", fontWeight: "600" }}>
+                <MapPin size={12} color="#60a5fa" /> {ext.locationName}
+              </div>
+              <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: "3px" }}>
+                GPS: {ext.latitude}°N, {ext.longitude}°E
+              </div>
+            </div>
+
+            {/* Hazards */}
+            <div>
+              <div style={{ fontSize: "10px", fontWeight: "700", color: "#f87171", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>
+                ⚠️ Environmental Hazards
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                {ext.hazards.map((h, i) => (
+                  <span key={i} style={{ fontSize: "10px", background: "#450a0a", color: "#f87171", border: "1px solid #7f1d1d", padding: "2px 8px", borderRadius: "4px" }}>{h}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Required Capabilities */}
+            <div>
+              <div style={{ fontSize: "10px", fontWeight: "700", color: "#60a5fa", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>
+                🎯 Required Capabilities
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                {ext.requiredCapabilities.map((c, i) => (
+                  <span key={i} style={{ fontSize: "10px", background: "#1e3a5f", color: "#93c5fd", border: "1px solid #1d4ed8", padding: "2px 8px", borderRadius: "4px" }}>{c}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* AI Summary */}
+            <div style={{ padding: "10px 12px", background: "#1a0b2e", borderRadius: "6px", border: "1px solid #581c87" }}>
+              <div style={{ fontSize: "10px", color: "#c084fc", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "5px", display: "flex", alignItems: "center", gap: "5px" }}>
+                <Bot size={10} /> AI Situation Summary
+              </div>
+              <div style={{ fontSize: "12px", color: "#e9d5ff", lineHeight: "1.5" }}>{ext.summary}</div>
+            </div>
+
+            {/* Dispatch CTA */}
+            <div style={{ borderTop: "1px solid var(--border-primary)", paddingTop: "12px" }}>
+              <button
+                onClick={handleDispatchIncident}
+                disabled={creating || callProgress < 50}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  background: creating ? "#1d4ed8" : "linear-gradient(135deg, #1d4ed8, #7c3aed)",
+                  border: "none",
+                  borderRadius: "8px",
+                  color: "#fff",
+                  fontSize: "13px",
+                  fontWeight: "700",
+                  cursor: creating || callProgress < 50 ? "not-allowed" : "pointer",
+                  opacity: callProgress < 50 ? 0.5 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  boxShadow: callProgress >= 50 ? "0 4px 20px rgba(37,99,235,0.4)" : "none",
+                  transition: "all 0.2s",
+                }}
+              >
+                {creating ? (
+                  <>Registering Incident & Opening Dispatch...</>
+                ) : isComplete ? (
+                  <><CheckCircle size={16} /> Authorize Incident & Match Responders</>
+                ) : (
+                  <><Zap size={16} /> {callProgress < 50 ? `Processing... ${callProgress}%` : "Authorize & Dispatch"}</>
+                )}
+              </button>
+              {callProgress >= 50 && !isComplete && (
+                <div style={{ textAlign: "center", fontSize: "10px", color: "var(--text-muted)", marginTop: "6px" }}>
+                  You can authorize dispatch early — AI extraction is {aiConfidence}% complete
+                </div>
               )}
-            </button>
-          </div>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
