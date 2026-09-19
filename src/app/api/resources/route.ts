@@ -73,25 +73,24 @@ export async function GET(req: NextRequest) {
       resources,
       total: resources.length,
     });
-<<<<<<< HEAD
-  } catch (error: any) {
-    console.error("GET /api/resources error:", error);
-    return NextResponse.json(
-      { success: false, error: error?.message || "Failed to fetch resources" },
-      { status: 500 }
-    );
-=======
   } catch (error) {
     console.warn("Database unavailable in /api/resources, serving synthetic resources fallback:", error);
     try {
       const { searchParams } = new URL(req.url);
-      const status = searchParams.get("status");
-      const type = searchParams.get("type");
+      const statusParam = searchParams.get("status");
+      const typeParam = searchParams.get("type");
       const search = searchParams.get("search")?.trim().toLowerCase();
 
       let filtered = FALLBACK_RESOURCES;
-      if (status && status !== "ALL") filtered = filtered.filter((r) => r.status === status);
-      if (type && type !== "ALL") filtered = filtered.filter((r) => r.type === type);
+
+      if (statusParam && statusParam !== "ALL") {
+        const statuses = statusParam.split(",").map((s) => s.trim()).filter(Boolean);
+        if (statuses.length > 0) filtered = filtered.filter((r) => statuses.includes(r.status));
+      }
+      if (typeParam && typeParam !== "ALL") {
+        const types = typeParam.split(",").map((s) => s.trim()).filter(Boolean);
+        if (types.length > 0) filtered = filtered.filter((r) => types.includes(r.type));
+      }
       if (search) {
         filtered = filtered.filter((r) =>
           r.name.toLowerCase().includes(search) ||
@@ -116,7 +115,6 @@ export async function GET(req: NextRequest) {
         isFallback: true,
       });
     }
->>>>>>> 82df473 (fix: add production database fallback handling)
   }
 }
 

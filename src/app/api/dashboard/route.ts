@@ -83,17 +83,12 @@ export async function GET(_req: NextRequest) {
       data,
       ...data,
     });
-<<<<<<< HEAD
-  } catch (error: any) {
-    console.error("GET /api/dashboard error:", error);
-    return NextResponse.json(
-      { success: false, error: error?.message || "Failed to fetch dashboard data" },
-      { status: 500 }
-    );
-=======
   } catch (error) {
     console.warn("Database unavailable in /api/dashboard, serving synthetic operations fallback:", error);
-    return NextResponse.json(FALLBACK_DASHBOARD_DATA);
->>>>>>> 82df473 (fix: add production database fallback handling)
+    return NextResponse.json({
+      success: true,
+      data: FALLBACK_DASHBOARD_DATA,
+      ...FALLBACK_DASHBOARD_DATA,
+    });
   }
 }

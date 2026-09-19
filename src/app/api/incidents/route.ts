@@ -64,27 +64,30 @@ export async function GET(req: NextRequest) {
       incidents,
       total: incidents.length,
     });
-<<<<<<< HEAD
-  } catch (error: any) {
-    console.error("GET /api/incidents error:", error);
-    return NextResponse.json(
-      { success: false, error: error?.message || "Failed to fetch incidents" },
-      { status: 500 }
-    );
-=======
   } catch (error) {
     console.warn("Database unavailable in /api/incidents, serving synthetic incidents fallback:", error);
     try {
       const { searchParams } = new URL(req.url);
-      const status = searchParams.get("status");
-      const severity = searchParams.get("severity");
-      const type = searchParams.get("type");
-      const limit = parseInt(searchParams.get("limit") ?? "50");
+      const statusParam = searchParams.get("status");
+      const severityParam = searchParams.get("severity");
+      const typeParam = searchParams.get("type");
+      const limit = parseInt(searchParams.get("limit") ?? "50", 10);
 
       let filtered = FALLBACK_INCIDENTS;
-      if (status && status !== "ALL") filtered = filtered.filter((i) => i.status === status);
-      if (severity && severity !== "ALL") filtered = filtered.filter((i) => i.severity === severity);
-      if (type && type !== "ALL") filtered = filtered.filter((i) => i.type === type);
+
+      if (statusParam && statusParam !== "ALL") {
+        const statuses = statusParam.split(",").map((s) => s.trim()).filter(Boolean);
+        if (statuses.length > 0) filtered = filtered.filter((i) => statuses.includes(i.status));
+      }
+      if (severityParam && severityParam !== "ALL") {
+        const severities = severityParam.split(",").map((s) => s.trim()).filter(Boolean);
+        if (severities.length > 0) filtered = filtered.filter((i) => severities.includes(i.severity));
+      }
+      if (typeParam && typeParam !== "ALL") {
+        const types = typeParam.split(",").map((s) => s.trim()).filter(Boolean);
+        if (types.length > 0) filtered = filtered.filter((i) => types.includes(i.type));
+      }
+
       const sliced = filtered.slice(0, limit);
 
       return NextResponse.json({
@@ -103,7 +106,6 @@ export async function GET(req: NextRequest) {
         isFallback: true,
       });
     }
->>>>>>> 82df473 (fix: add production database fallback handling)
   }
 }
 
