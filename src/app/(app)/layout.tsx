@@ -25,9 +25,21 @@ import {
   Bell,
   Menu,
   X,
+  Flame,
+  PlusCircle,
+  History,
 } from "lucide-react";
 
 const NAV_GROUPS = [
+  {
+    label: "EMERGENCY",
+    items: [
+      { href: "/sos", icon: Flame, label: "Emergency SOS" },
+      { href: "/register-incident", icon: PlusCircle, label: "Register Incident" },
+      { href: "/my-incidents", icon: History, label: "My Incidents" },
+      { href: "/emergency-status", icon: Activity, label: "Emergency Status" },
+    ],
+  },
   {
     label: "COMMAND",
     items: [
