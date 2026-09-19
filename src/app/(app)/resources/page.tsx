@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime, extractApiData } from "@/lib/utils";
 
 interface Resource {
   id: string;
@@ -75,9 +75,7 @@ export default function ResourcesPage() {
 
       const res = await fetch(`/api/resources?${params.toString()}`);
       const json = await res.json();
-      if (json.success) {
-        setResources(json.data);
-      }
+      setResources(extractApiData<Resource>(json));
     } catch (err) {
       console.error("Failed to load resources:", err);
     } finally {

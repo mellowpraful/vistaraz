@@ -124,9 +124,9 @@ async function runTests() {
   const shape2 = { incidents: [{ id: "2" }], total: 1 };
   const shape3 = { resources: [{ id: "3" }] };
 
-  assert(extractApiData(shape1).length === 1 && extractApiData(shape1)[0].id === "1", "Extracts from { success: true, data: [...] } envelope");
-  assert(extractApiData(shape2).length === 1 && extractApiData(shape2)[0].id === "2", "Extracts from legacy { incidents: [...] } shape");
-  assert(extractApiData(shape3).length === 1 && extractApiData(shape3)[0].id === "3", "Extracts from legacy { resources: [...] } shape");
+  assert(extractApiData<{id: string}>(shape1).length === 1 && extractApiData<{id: string}>(shape1)[0].id === "1", "Extracts from { success: true, data: [...] } envelope");
+  assert(extractApiData<{id: string}>(shape2).length === 1 && extractApiData<{id: string}>(shape2)[0].id === "2", "Extracts from legacy { incidents: [...] } shape");
+  assert(extractApiData<{id: string}>(shape3).length === 1 && extractApiData<{id: string}>(shape3)[0].id === "3", "Extracts from legacy { resources: [...] } shape");
   assert(extractApiItem<{ id: string }>({ data: { id: "item-1" } })?.id === "item-1", "Extracts item from object wrapper");
 
 

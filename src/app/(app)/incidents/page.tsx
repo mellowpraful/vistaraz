@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { formatRelativeTime } from "@/lib/utils";
-import { INCIDENT_TYPE_ICONS, SEVERITY_DOT } from "@/lib/types";
+import { formatRelativeTime, extractApiData } from "@/lib/utils";
+import { INCIDENT_TYPE_ICONS } from "@/lib/types";
+import { Badge } from "@/components/ui/Badge";
+import { AlertTriangle, RefreshCw, Plus, MapPin, Clock, Users, Zap, ChevronRight, Search, X } from "lucide-react";
 
 interface IncidentItem {
   id: string;
@@ -83,9 +85,8 @@ export default function IncidentsPage() {
 
       const res = await fetch(`/api/incidents?${params.toString()}`);
       const json = await res.json();
-      if (json.success) {
-        setIncidents(json.data);
-      }
+      // Use robust extractApiData that handles both {success, data} and legacy {incidents} shapes
+      setIncidents(extractApiData<IncidentItem>(json));
     } catch (err) {
       console.error("Failed to fetch incidents:", err);
     } finally {
@@ -183,266 +184,279 @@ export default function IncidentsPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-100">
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <h1 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <AlertTriangle size={20} color="#ef4444" />
               Incident Response Queue
             </h1>
-            <span className="badge-critical font-mono text-xs px-2.5 py-0.5 rounded-full">
+            <span style={{
+              background: "#450a0a", border: "1px solid #7f1d1d", color: "#f87171",
+              fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px",
+              letterSpacing: "0.5px",
+            }}>
               {incidents.filter((i) => i.status !== "RESOLVED" && i.status !== "CLOSED").length} Active
             </span>
           </div>
-          <p className="text-sm text-slate-400 mt-1">
+          <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
             Real-time multi-agency incident intake, triage, and live command overview
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <button
             onClick={() => fetchIncidents()}
-            className="btn-secondary text-xs flex items-center gap-1.5"
-            title="Refresh list"
+            style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: "7px 14px", background: "var(--bg-card)",
+              border: "1px solid var(--border-primary)", borderRadius: "6px",
+              color: "var(--text-secondary)", cursor: "pointer", fontSize: "12px",
+            }}
           >
-            <span>🔄</span> Refresh
+            <RefreshCw size={12} /> Refresh
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="btn-primary text-xs flex items-center gap-2"
+            style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: "7px 16px", background: "var(--accent-blue)",
+              border: "none", borderRadius: "6px",
+              color: "#fff", cursor: "pointer", fontSize: "12px", fontWeight: "600",
+            }}
           >
-            <span>➕</span> Log New Incident
+            <Plus size={13} /> Log New Incident
           </button>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="card p-4 space-y-4">
-        <div className="flex flex-col md:flex-row gap-3">
-          {/* Search bar */}
-          <div className="flex-1 relative">
-            <span className="absolute left-3 top-2.5 text-slate-400 text-sm">🔍</span>
-            <input
-              type="text"
-              placeholder="Search by title, location, description, or ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-base pl-9 text-xs w-full"
-            />
+      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)", borderRadius: "8px", padding: "14px 16px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+            {/* Search bar */}
+            <div style={{ flex: 1, minWidth: "200px", position: "relative" }}>
+              <Search size={13} style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+              <input
+                type="text"
+                placeholder="Search by title, location, or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: "100%", paddingLeft: "32px", paddingRight: "10px", paddingTop: "8px", paddingBottom: "8px",
+                  background: "var(--bg-secondary)", border: "1px solid var(--border-primary)",
+                  borderRadius: "6px", color: "var(--text-primary)", fontSize: "13px", fontFamily: "inherit",
+                }}
+              />
+            </div>
+
+            {/* Status Dropdown */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              style={{
+                padding: "7px 10px", background: "var(--bg-secondary)",
+                border: "1px solid var(--border-primary)", borderRadius: "6px",
+                color: "var(--text-secondary)", fontSize: "12px", cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              {STATUSES.map((st) => (
+                <option key={st} value={st}>{st.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+
+            {/* Type Dropdown */}
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              style={{
+                padding: "7px 10px", background: "var(--bg-secondary)",
+                border: "1px solid var(--border-primary)", borderRadius: "6px",
+                color: "var(--text-secondary)", fontSize: "12px", cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              {TYPES.map((tp) => (
+                <option key={tp} value={tp}>{tp.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+
+            {(selectedSeverity !== "ALL" || selectedStatus !== "ALL" || selectedType !== "ALL" || searchQuery) && (
+              <button
+                onClick={() => { setSelectedSeverity("ALL"); setSelectedStatus("ALL"); setSelectedType("ALL"); setSearchQuery(""); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: "4px",
+                  padding: "7px 12px", background: "transparent",
+                  border: "1px solid var(--border-secondary)", borderRadius: "6px",
+                  color: "var(--text-muted)", cursor: "pointer", fontSize: "12px",
+                }}
+              >
+                <X size={11} /> Clear
+              </button>
+            )}
+
+            <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: "auto", whiteSpace: "nowrap" }}>
+              <strong style={{ color: "var(--text-primary)" }}>{filteredIncidents.length}</strong> of {incidents.length}
+            </span>
           </div>
 
-          {/* Severity Badges Filter */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
-            <span className="text-xs text-slate-500 font-medium mr-1 uppercase">Severity:</span>
+          {/* Severity Pill Filters */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "10px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Severity:</span>
             {SEVERITIES.map((sev) => (
               <button
                 key={sev}
                 onClick={() => setSelectedSeverity(sev)}
-                className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
-                  selectedSeverity === sev
-                    ? "bg-blue-600 text-white font-semibold"
-                    : "bg-slate-800 text-slate-400 hover:bg-slate-700"
-                }`}
+                style={{
+                  padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "600",
+                  border: selectedSeverity === sev ? "1px solid #3b82f6" : "1px solid var(--border-primary)",
+                  background: selectedSeverity === sev ? "rgba(37,99,235,0.15)" : "var(--bg-secondary)",
+                  color: selectedSeverity === sev ? "#60a5fa" : "var(--text-muted)",
+                  cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.5px", transition: "all 0.15s",
+                }}
               >
                 {sev}
               </button>
             ))}
           </div>
         </div>
-
-        <div className="flex flex-wrap items-center gap-4 text-xs pt-2 border-t border-slate-800">
-          {/* Status Dropdown */}
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Status:</span>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="input-base py-1 px-2 text-xs bg-slate-900"
-            >
-              {STATUSES.map((st) => (
-                <option key={st} value={st}>
-                  {st.replace("_", " ")}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Type Dropdown */}
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Type:</span>
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="input-base py-1 px-2 text-xs bg-slate-900"
-            >
-              {TYPES.map((tp) => (
-                <option key={tp} value={tp}>
-                  {tp.replace("_", " ")}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="ml-auto text-slate-500 text-xs">
-            Showing <strong className="text-slate-300">{filteredIncidents.length}</strong> of{" "}
-            {incidents.length} incidents
-          </div>
-        </div>
       </div>
 
       {/* Incident List */}
       {loading ? (
-        <div className="card p-12 text-center text-slate-400 flex flex-col items-center justify-center space-y-3">
-          <div className="animate-spin text-3xl">⏳</div>
-          <p className="text-sm">Loading incident queue...</p>
+        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)", borderRadius: "8px", padding: "60px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+          <div style={{ width: "36px", height: "36px", borderRadius: "50%", border: "3px solid var(--border-primary)", borderTopColor: "var(--accent-blue)", animation: "spin 0.8s linear infinite" }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>Loading incident queue...</p>
         </div>
       ) : filteredIncidents.length === 0 ? (
-        <div className="card p-12 text-center text-slate-500 space-y-3">
-          <div className="text-4xl">🛡️</div>
-          <h3 className="text-base font-semibold text-slate-300">No matching incidents found</h3>
-          <p className="text-xs max-w-sm mx-auto">
-            Try adjusting your search query, severity, or status filters.
-          </p>
+        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)", borderRadius: "8px", padding: "60px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+          <AlertTriangle size={36} color="var(--text-muted)" />
+          <div style={{ fontSize: "15px", fontWeight: "600", color: "var(--text-secondary)" }}>No matching incidents found</div>
+          <p style={{ fontSize: "13px", color: "var(--text-muted)", maxWidth: "320px" }}>Try adjusting your search query, severity, or status filters.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {filteredIncidents.map((incident) => {
             const isCritical = incident.severity === "CRITICAL";
             const isHigh = incident.severity === "HIGH";
+            const accentColor = isCritical ? "#ef4444" : isHigh ? "#f97316" : "#3b82f6";
             let parsedHazards: string[] = [];
             let parsedCaps: string[] = [];
-            try {
-              if (incident.hazards) parsedHazards = JSON.parse(incident.hazards);
-            } catch {}
-            try {
-              if (incident.requiredCapabilities) parsedCaps = JSON.parse(incident.requiredCapabilities);
-            } catch {}
+            try { if (incident.hazards) parsedHazards = JSON.parse(incident.hazards); } catch {}
+            try { if (incident.requiredCapabilities) parsedCaps = JSON.parse(incident.requiredCapabilities); } catch {}
 
             return (
               <div
                 key={incident.id}
-                className={`card p-4 transition-all duration-200 hover:border-slate-600 hover:shadow-lg ${
-                  isCritical ? "border-l-4 border-l-red-500" : isHigh ? "border-l-4 border-l-orange-500" : "border-l-4 border-l-blue-500"
-                }`}
+                style={{
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-primary)",
+                  borderLeft: `3px solid ${accentColor}`,
+                  borderRadius: "8px",
+                  padding: "14px 16px",
+                  transition: "all 0.2s",
+                  animation: isCritical ? "glow-pulse 2s ease-in-out infinite" : undefined,
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border-secondary)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border-primary)"; }}
               >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
                   {/* Left info */}
-                  <div className="space-y-2 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xl">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "18px", flexShrink: 0 }}>
                         {INCIDENT_TYPE_ICONS[incident.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨"}
                       </span>
                       <Link
                         href={`/incidents/${incident.id}`}
-                        className="text-base font-bold text-slate-100 hover:text-blue-400 transition-colors"
+                        style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)", textDecoration: "none", flex: 1, minWidth: 0 }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#60a5fa"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--text-primary)"; }}
                       >
                         {incident.title}
                       </Link>
-
-                      {/* Severity badge */}
-                      <span
-                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                          incident.severity === "CRITICAL"
-                            ? "bg-red-950 text-red-300 border border-red-800 animate-pulse"
-                            : incident.severity === "HIGH"
-                            ? "bg-orange-950 text-orange-300 border border-orange-800"
-                            : incident.severity === "MEDIUM"
-                            ? "bg-yellow-950 text-yellow-300 border border-yellow-800"
-                            : "bg-slate-800 text-slate-300 border border-slate-700"
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${SEVERITY_DOT[incident.severity as keyof typeof SEVERITY_DOT] || "bg-slate-400"}`} />
-                        {incident.severity}
-                      </span>
-
-                      {/* Status badge */}
-                      <span className="badge-neutral text-[11px] px-2 py-0.5 rounded font-mono">
-                        {incident.status.replace("_", " ")}
-                      </span>
-
-                      {/* AI Extracted tag */}
+                      <Badge variant={incident.severity as any} dot pulse={isCritical} />
+                      <Badge variant={incident.status as any} />
                       {incident.aiExtracted && (
-                        <span className="text-[10px] bg-purple-950 text-purple-300 border border-purple-800 px-1.5 py-0.5 rounded font-mono">
-                          🤖 AI Extracted
-                        </span>
+                        <Badge variant="AI">🤖 AI</Badge>
                       )}
                     </div>
 
-                    <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                    <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>
                       {incident.description}
                     </p>
 
-                    {/* Metadata tags */}
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 pt-1">
+                    {/* Metadata */}
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px", fontSize: "11px", color: "var(--text-muted)" }}>
                       {incident.locationName && (
-                        <span className="flex items-center gap-1">
-                          📍 <span className="text-slate-300">{incident.locationName}</span>
+                        <span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                          <MapPin size={10} /> {incident.locationName}
                         </span>
                       )}
-                      {incident.affectedCount !== null && incident.affectedCount > 0 && (
-                        <span className="flex items-center gap-1">
-                          👥 Affected: <strong className="text-slate-200">{incident.affectedCount}</strong>
+                      {incident.affectedCount != null && incident.affectedCount > 0 && (
+                        <span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                          <Users size={10} /> {incident.affectedCount} affected
                         </span>
                       )}
-                      {incident.injuryCount !== null && incident.injuryCount > 0 && (
-                        <span className="flex items-center gap-1 text-red-400">
-                          🩹 Injured: <strong>{incident.injuryCount}</strong>
+                      {incident.injuryCount != null && incident.injuryCount > 0 && (
+                        <span style={{ display: "flex", alignItems: "center", gap: "3px", color: "#f87171" }}>
+                          🩹 {incident.injuryCount} injured
                         </span>
                       )}
-                      <span className="flex items-center gap-1 font-mono text-[11px] text-slate-500">
-                        🕒 {formatRelativeTime(incident.createdAt)}
+                      <span style={{ display: "flex", alignItems: "center", gap: "3px", fontFamily: "'JetBrains Mono', monospace" }}>
+                        <Clock size={10} /> {formatRelativeTime(incident.createdAt)}
                       </span>
                     </div>
 
-                    {/* Hazards & Required Capabilities Chips */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      {parsedHazards.slice(0, 3).map((h, i) => (
-                        <span
-                          key={i}
-                          className="text-[10px] bg-red-950/60 text-red-400 border border-red-900/60 px-2 py-0.5 rounded"
-                        >
-                          ⚠️ {h}
-                        </span>
-                      ))}
-                      {parsedCaps.slice(0, 3).map((c, i) => (
-                        <span
-                          key={i}
-                          className="text-[10px] bg-blue-950/60 text-blue-300 border border-blue-900/60 px-2 py-0.5 rounded"
-                        >
-                          🎯 {c}
-                        </span>
-                      ))}
-                    </div>
+                    {/* Hazard & Capability chips */}
+                    {(parsedHazards.length > 0 || parsedCaps.length > 0) && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
+                        {parsedHazards.slice(0, 3).map((h, i) => (
+                          <span key={i} style={{ fontSize: "10px", background: "#450a0a", color: "#f87171", border: "1px solid #7f1d1d", padding: "2px 8px", borderRadius: "4px" }}>⚠️ {h}</span>
+                        ))}
+                        {parsedCaps.slice(0, 3).map((c, i) => (
+                          <span key={i} style={{ fontSize: "10px", background: "#1e3a5f", color: "#93c5fd", border: "1px solid #1d4ed8", padding: "2px 8px", borderRadius: "4px" }}>🎯 {c}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Action Column */}
-                  <div className="flex lg:flex-col items-center lg:items-end justify-between gap-3 border-t lg:border-t-0 pt-3 lg:pt-0 border-slate-800">
-                    <div className="text-right">
-                      <div className="text-[11px] text-slate-500 font-mono">Assigned Units</div>
-                      <div className="text-xs font-semibold text-slate-200">
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "10px", flexShrink: 0 }}>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "2px" }}>Assigned</div>
+                      <div style={{ fontSize: "12px", fontWeight: "700" }}>
                         {incident.assignments.length > 0 ? (
-                          <span className="text-emerald-400">
-                            {incident.assignments.length} Units On Duty
-                          </span>
+                          <span style={{ color: "#4ade80" }}>{incident.assignments.length} units</span>
                         ) : (
-                          <span className="text-amber-400 font-medium">Unassigned</span>
+                          <span style={{ color: "#fbbf24" }}>Unassigned</span>
                         )}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
+                    <div style={{ display: "flex", gap: "6px" }}>
                       <Link
                         href={`/dispatch?incidentId=${incident.id}`}
-                        className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1"
+                        style={{
+                          display: "flex", alignItems: "center", gap: "4px",
+                          padding: "6px 12px", background: "var(--accent-blue)",
+                          border: "none", borderRadius: "6px", color: "#fff",
+                          fontSize: "11px", fontWeight: "600", textDecoration: "none",
+                        }}
                       >
-                        <span>⚡</span> Dispatch
+                        <Zap size={11} /> Dispatch
                       </Link>
                       <Link
                         href={`/incidents/${incident.id}`}
-                        className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1"
+                        style={{
+                          display: "flex", alignItems: "center", gap: "4px",
+                          padding: "6px 12px", background: "var(--bg-secondary)",
+                          border: "1px solid var(--border-primary)", borderRadius: "6px",
+                          color: "var(--text-secondary)", fontSize: "11px", fontWeight: "500", textDecoration: "none",
+                        }}
                       >
-                        Details →
+                        Details <ChevronRight size={11} />
                       </Link>
                     </div>
                   </div>
@@ -455,174 +469,95 @@ export default function IncidentsPage() {
 
       {/* Create Incident Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <div className="card max-w-2xl w-full p-6 space-y-5 my-8 border-slate-700 bg-slate-900 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🚨</span>
-                <h3 className="text-lg font-bold text-slate-100">Log New Emergency Incident</h3>
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", overflowY: "auto" }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-secondary)", borderRadius: "12px", maxWidth: "640px", width: "100%", padding: "24px", boxShadow: "0 25px 80px rgba(0,0,0,0.6)", margin: "auto" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-primary)", paddingBottom: "14px", marginBottom: "20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ width: "34px", height: "34px", borderRadius: "8px", background: "#450a0a", border: "1px solid #7f1d1d", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <AlertTriangle size={16} color="#f87171" />
+                </div>
+                <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", margin: 0 }}>Log New Emergency Incident</h3>
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-white text-lg px-2"
+                style={{ background: "transparent", border: "1px solid var(--border-primary)", borderRadius: "6px", color: "var(--text-muted)", cursor: "pointer", padding: "4px 8px", fontSize: "14px" }}
               >
-                ✕
+                <X size={14} />
               </button>
             </div>
 
             {/* AI Fast Intake Box */}
-            <div className="p-3.5 bg-purple-950/40 border border-purple-800/60 rounded-lg space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                  ✨ Fast AI Triage / Raw 911 Call Transcript Auto-Fill
+            <div style={{ padding: "14px", background: "#1a0b2e", border: "1px solid #581c87", borderRadius: "8px", marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                <span style={{ fontSize: "12px", fontWeight: "700", color: "#c084fc", display: "flex", alignItems: "center", gap: "6px" }}>
+                  ✨ Fast AI Triage Auto-Fill
                 </span>
                 <button
                   type="button"
                   onClick={handleAiExtract}
                   disabled={aiExtracting || !formRawText.trim()}
-                  className="btn-primary text-[11px] py-1 px-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50"
+                  style={{
+                    padding: "5px 12px", background: aiExtracting ? "#4c1d95" : "#7c3aed",
+                    border: "none", borderRadius: "6px", color: "#e9d5ff",
+                    fontSize: "11px", fontWeight: "600", cursor: "pointer",
+                    opacity: !formRawText.trim() ? 0.5 : 1,
+                  }}
                 >
                   {aiExtracting ? "Analyzing..." : "Auto-Extract with AI"}
                 </button>
               </div>
               <textarea
                 rows={2}
-                placeholder="Paste raw caller transcript, radio chatter, or notes (e.g. 'Massive flood near Sabarmati Ashram, 25 people stranded on roof, elderly injured, need rescue boats ASAP')..."
+                placeholder="Paste raw caller transcript, radio chatter, or notes..."
                 value={formRawText}
                 onChange={(e) => setFormRawText(e.target.value)}
-                className="input-base text-xs w-full bg-slate-950"
+                style={{ width: "100%", padding: "8px", background: "#0d0221", border: "1px solid #581c87", borderRadius: "6px", color: "var(--text-primary)", fontSize: "12px", fontFamily: "inherit", resize: "vertical" }}
               />
             </div>
 
             {/* Structured Form */}
-            <form onSubmit={handleCreateIncident} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-xs font-medium text-slate-300">Incident Title *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g. Flash Flood - Sabarmati Riverfront Sector 4"
-                    className="input-base text-xs w-full"
-                  />
+            <form onSubmit={handleCreateIncident} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Incident Title *</label>
+                  <input type="text" required value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="e.g. Flash Flood - Sabarmati Riverfront Sector 4" className="input" />
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-300">Incident Type</label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="input-base text-xs w-full"
-                  >
-                    {TYPES.filter((t) => t !== "ALL").map((t) => (
-                      <option key={t} value={t}>
-                        {t.replace("_", " ")}
-                      </option>
-                    ))}
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Incident Type</label>
+                  <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className="input">
+                    {TYPES.filter((t) => t !== "ALL").map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
                   </select>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-300">Severity Level</label>
-                  <select
-                    value={formData.severity}
-                    onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
-                    className="input-base text-xs w-full"
-                  >
-                    {SEVERITIES.filter((s) => s !== "ALL").map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Severity Level</label>
+                  <select value={formData.severity} onChange={(e) => setFormData({ ...formData, severity: e.target.value })} className="input">
+                    {SEVERITIES.filter((s) => s !== "ALL").map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-xs font-medium text-slate-300">Description / Situation Details *</label>
-                  <textarea
-                    required
-                    rows={3}
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe scene conditions, hazards, access routes, and trapped victims..."
-                    className="input-base text-xs w-full"
-                  />
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Description *</label>
+                  <textarea required rows={3} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Describe scene conditions, hazards, access routes, and trapped victims..." className="input" style={{ resize: "vertical" }} />
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-300">Location Landmark / Address</label>
-                  <input
-                    type="text"
-                    value={formData.locationName}
-                    onChange={(e) => setFormData({ ...formData, locationName: e.target.value })}
-                    placeholder="e.g. Near Sabarmati Ashram, Vadaj Road"
-                    className="input-base text-xs w-full"
-                  />
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Location</label>
+                  <input type="text" value={formData.locationName} onChange={(e) => setFormData({ ...formData, locationName: e.target.value })} placeholder="e.g. Near Sabarmati Ashram, Vadaj Road" className="input" />
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-300">Latitude</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.latitude}
-                      onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })}
-                      className="input-base text-xs w-full font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-300">Longitude</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.longitude}
-                      onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })}
-                      className="input-base text-xs w-full font-mono"
-                    />
-                  </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Affected People</label>
+                  <input type="number" min="0" value={formData.affectedCount} onChange={(e) => setFormData({ ...formData, affectedCount: parseInt(e.target.value) || 0 })} className="input" />
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-300">Estimated People Affected</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.affectedCount}
-                    onChange={(e) => setFormData({ ...formData, affectedCount: parseInt(e.target.value) || 0 })}
-                    className="input-base text-xs w-full"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-300">Injuries Reported</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.injuryCount}
-                    onChange={(e) => setFormData({ ...formData, injuryCount: parseInt(e.target.value) || 0 })}
-                    className="input-base text-xs w-full"
-                  />
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Injuries Reported</label>
+                  <input type="number" min="0" value={formData.injuryCount} onChange={(e) => setFormData({ ...formData, injuryCount: parseInt(e.target.value) || 0 })} className="input" />
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="btn-secondary text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="btn-primary text-xs px-5"
-                >
-                  {creating ? "Submitting..." : "🚨 Register Incident"}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", paddingTop: "14px", borderTop: "1px solid var(--border-primary)" }}>
+                <button type="button" onClick={() => setShowCreateModal(false)} style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--border-primary)", borderRadius: "6px", color: "var(--text-muted)", cursor: "pointer", fontSize: "13px" }}>Cancel</button>
+                <button type="submit" disabled={creating} style={{ padding: "8px 20px", background: "var(--accent-blue)", border: "none", borderRadius: "6px", color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <AlertTriangle size={13} />
+                  {creating ? "Submitting..." : "Register Incident"}
                 </button>
               </div>
             </form>
@@ -632,3 +567,4 @@ export default function IncidentsPage() {
     </div>
   );
 }
+
