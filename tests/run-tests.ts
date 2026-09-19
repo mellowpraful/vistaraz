@@ -129,6 +129,108 @@ async function runTests() {
   assert(extractApiData<{id: string}>(shape3).length === 1 && extractApiData<{id: string}>(shape3)[0].id === "3", "Extracts from legacy { resources: [...] } shape");
   assert(extractApiItem<{ id: string }>({ data: { id: "item-1" } })?.id === "item-1", "Extracts item from object wrapper");
 
+  // ─── 7. AI Commander & SITREP Explainability Tests ──────────
+  console.log("\n🔹 7. AI Commander SITREP & Explainability Tests");
+  const { generateExecutiveSitrep, executeCopilotQuery } = await import("../src/lib/ai/commander-service");
+  const sitrep = await generateExecutiveSitrep();
+
+  assert(Boolean(sitrep.sitrepId), "Executive SITREP has a generated SITREP ID");
+  assert(sitrep.confidenceScore >= 50 && sitrep.confidenceScore <= 100, "Confidence score is within calibrated 50-100% range");
+  assert(sitrep.confirmedFacts.length > 0, "SITREP contains key confirmed facts with source telemetry");
+  assert(sitrep.unverifiedReports.length > 0, "SITREP contains unverified reports marked with uncertainty reasons");
+  assert(sitrep.priorityRisks.length > 0, "SITREP computes priority risks with probability and time to impact");
+  assert(sitrep.cascadingEffects.length > 0, "SITREP identifies multi-sector cascading failure pathways");
+  assert(sitrep.bottlenecks.length > 0, "SITREP identifies resource bottlenecks and deficit counts");
+  assert(sitrep.recommendations.length > 0, "SITREP provides actionable AI recommendations");
+
+  const sampleRec = sitrep.recommendations[0];
+  assert(Boolean(sampleRec.recommendation), "Recommendation specifies what is recommended");
+  assert(Boolean(sampleRec.whyRecommended), "Recommendation explains operational rationale (why recommended)");
+  assert(Boolean(sampleRec.supportingData.incidentTitle), "Recommendation includes supporting incident/resource data");
+  assert(Boolean(sampleRec.uncertaintyOrMissingInfo), "Recommendation explicitly flags uncertainty or missing information");
+  assert(Boolean(sampleRec.requiredHumanDecision), "Recommendation requires human commander authorization");
+  assert(sampleRec.approvalStatus === "PENDING", "Initial recommendation approval status is PENDING");
+
+  // Copilot Query Test
+  const copilotAnswer = await executeCopilotQuery("hospital beds");
+  assert(copilotAnswer.reply.includes("Hospital"), "Copilot responds accurately to hospital telemetry inquiries");
+  assert((copilotAnswer.recommendations?.length ?? 0) > 0, "Copilot provides actionable next-step links");
+
+  // ─── 8. Digital Twin Simulation Sandbox Isolation Tests ─────
+  console.log("\n🔹 8. Digital Twin Simulation Sandbox Isolation Tests");
+  const { prisma } = await import("../src/lib/prisma");
+  const liveIncidentsBefore = await prisma.incident.count({ where: { simulationId: null } });
+
+  // Simulate a scenario creation
+  const testScenario = await prisma.simulationScenario.create({
+    data: {
+      name: "Test Disaster Sandbox",
+      description: "Automated isolation test scenario",
+      type: "FLOOD",
+      status: "DRAFT",
+      config: JSON.stringify({ weather: "Heavy Storm" }),
+    },
+  });
+
+  const liveIncidentsAfter = await prisma.incident.count({ where: { simulationId: null } });
+  assert(liveIncidentsBefore === liveIncidentsAfter, "Simulation creation does not mutate live incident records");
+
+  // Clean up test scenario
+  await prisma.simulationScenario.delete({ where: { id: testScenario.id } });
+
+  // ─── 9. Dispatch Approval Normalization Tests ───────────────
+  console.log("\n🔹 9. Dispatch Approval Normalization Tests");
+  const { ApproveDispatchSchema } = await import("../src/lib/types");
+
+  // Verify that normalized "APPROVE" -> "APPROVED" satisfies the schema
+  const rawPayload = {
+    recommendationId: "rec-test-123",
+    action: "APPROVE",
+    approvedBy: "demo-commander",
+  };
+  const normalizedAction = rawPayload.action === "APPROVE" ? "APPROVED" : rawPayload.action;
+  const normalizedPayload = {
+    ...rawPayload,
+    action: normalizedAction,
+    userId: rawPayload.approvedBy,
+  };
+  const validationResult = ApproveDispatchSchema.safeParse(normalizedPayload);
+  assert(validationResult.success === true, "Normalized dispatch approval payload passes Zod validation");
+
+  // ─── 10. Deduplication Service Tests ────────────────────────
+  console.log("\n🔹 10. Incident Deduplication Service Tests");
+  const { detectDuplicates } = await import("../src/lib/ai/mock-analyzer");
+  const primaryInc = {
+    id: "inc-prime",
+    title: "Flood in Usmanpura",
+    locationName: "Usmanpura Riverfront, Ahmedabad",
+    type: "FLOOD",
+    latitude: 23.0456,
+    longitude: 72.5721,
+  };
+  const existingList = [
+    {
+      id: "inc-dup-1",
+      title: "Water rising near Usmanpura river bank",
+      locationName: "Usmanpura Riverfront, Ahmedabad",
+      type: "FLOOD",
+      latitude: 23.0458,
+      longitude: 72.5723,
+    },
+    {
+      id: "inc-diff-1",
+      title: "Accident on SG Highway",
+      locationName: "SG Highway, Ahmedabad",
+      type: "ROAD_ACCIDENT",
+      latitude: 23.0289,
+      longitude: 72.5067,
+    },
+  ];
+
+  const dupResult = await detectDuplicates(primaryInc, existingList);
+  assert(dupResult.isDuplicate === true, "Accurately detects duplicate flood report in same zone");
+  assert(dupResult.relatedIds.includes("inc-dup-1"), "Identifies correct related duplicate incident ID");
+  assert(!dupResult.relatedIds.includes("inc-diff-1"), "Excludes unrelated incident at different location");
 
   // ─── 7. Resource Fleet & Equipment Parser Tests ────────────
   console.log("\n🔹 7. Resource Fleet & Equipment Parser Tests");
@@ -311,8 +413,8 @@ async function runTests() {
   );
 
   // ─── 11. Dispatch Approval & Rejection Schema Tests ───────────
+  // Note: ApproveDispatchSchema already imported in section 9 above
   console.log("\n🔹 11. Dispatch Approval, Rejection & Commander Override Schema Tests");
-  const { ApproveDispatchSchema } = await import("../src/lib/types");
 
   // Approval schema parse
   const validApproval = {
@@ -352,5 +454,3 @@ async function runTests() {
 }
 
 runTests();
-
-
