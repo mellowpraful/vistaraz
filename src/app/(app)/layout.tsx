@@ -152,8 +152,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         style={{
           width: sidebarW,
           minWidth: sidebarW,
-          background: "var(--bg-secondary)",
-          borderRight: "1px solid var(--border-primary)",
+          background: "linear-gradient(180deg, rgba(6, 11, 22, 0.96) 0%, rgba(3, 7, 18, 0.98) 100%)",
+          borderRight: "1px solid rgba(255, 255, 255, 0.08)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           display: "flex",
           flexDirection: "column",
           transition: "width 0.25s cubic-bezier(0.4,0,0.2,1)",
@@ -163,17 +165,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           top: 0,
           bottom: 0,
           zIndex: 100,
+          boxShadow: "4px 0 24px rgba(0, 0, 0, 0.5)",
         }}
       >
         {/* Brand */}
         <div
           style={{
-            padding: "0 12px",
-            borderBottom: "1px solid var(--border-primary)",
+            padding: "0 14px",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
             display: "flex",
             alignItems: "center",
-            gap: "10px",
-            minHeight: "60px",
+            gap: "12px",
+            minHeight: "62px",
             flexShrink: 0,
           }}
         >
@@ -283,41 +286,40 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       display: "flex",
                       alignItems: "center",
                       gap: "10px",
-                      padding: collapsed ? "10px" : "8px 10px",
-                      borderRadius: "6px",
-                      marginBottom: "1px",
+                      padding: collapsed ? "10px" : "8px 12px",
+                      borderRadius: "7px",
+                      marginBottom: "2px",
                       textDecoration: "none",
                       fontSize: "13px",
                       fontWeight: isActive ? "600" : "500",
-                      color: isActive ? "#60a5fa" : "var(--text-secondary)",
-                      background: isActive ? "rgba(37,99,235,0.12)" : "transparent",
-                      border: isActive
-                        ? "1px solid rgba(37,99,235,0.3)"
-                        : "1px solid transparent",
-                      transition: "all 0.15s",
+                      color: isActive ? "#93c5fd" : "var(--text-secondary)",
+                      background: isActive
+                        ? "linear-gradient(90deg, rgba(37, 99, 235, 0.22) 0%, rgba(37, 99, 235, 0.04) 100%)"
+                        : "transparent",
+                      borderStyle: "solid",
+                      borderTopWidth: "1px",
+                      borderRightWidth: "1px",
+                      borderBottomWidth: "1px",
+                      borderLeftWidth: "3px",
+                      borderTopColor: isActive ? "rgba(59, 130, 246, 0.25)" : "transparent",
+                      borderRightColor: isActive ? "rgba(59, 130, 246, 0.15)" : "transparent",
+                      borderBottomColor: isActive ? "rgba(59, 130, 246, 0.15)" : "transparent",
+                      borderLeftColor: isActive ? "#3b82f6" : "transparent",
+                      transition: "all 0.18s ease",
                       justifyContent: collapsed ? "center" : "flex-start",
                       overflow: "hidden",
                       whiteSpace: "nowrap",
                       position: "relative",
+                      boxShadow: isActive ? "0 0 16px rgba(37, 99, 235, 0.18)" : "none",
                     }}
-                    onMouseEnter={(e) => {
-                      if (!isActive) {
-                        (e.currentTarget as HTMLElement).style.background = "var(--bg-elevated)";
-                        (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) {
-                        (e.currentTarget as HTMLElement).style.background = "transparent";
-                        (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
-                      }
-                    }}
+                    className={`nav-item-link ${isActive ? "active" : ""}`}
                   >
                     <IconComponent
-                      size={15}
-                      style={{ flexShrink: 0, color: isActive ? "#60a5fa" : undefined }}
+                      size={16}
+                      color={isActive ? "#60a5fa" : "#94a3b8"}
+                      style={{ flexShrink: 0 }}
                     />
-                    {!collapsed && item.label}
+                    {!collapsed && <span>{item.label}</span>}
                   </Link>
                 );
               })}
@@ -580,17 +582,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 alignItems: "center",
                 gap: "6px",
                 padding: "4px 12px",
-                background: "#052e16",
-                border: "1px solid #14532d",
+                background: "rgba(5, 46, 22, 0.8)",
+                border: "1px solid rgba(34, 197, 94, 0.4)",
                 borderRadius: "20px",
                 fontSize: "10px",
                 color: "#4ade80",
                 fontWeight: "700",
-                letterSpacing: "0.5px",
+                letterSpacing: "0.6px",
+                boxShadow: "0 0 10px rgba(34, 197, 94, 0.2)",
               }}
             >
-              <Wifi size={10} />
-              SYSTEMS ONLINE
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: "#4ade80",
+                  boxShadow: "0 0 6px #4ade80",
+                }}
+              />
+              DEFCON 2 • ACTIVE
             </div>
 
             {/* Region */}
@@ -598,10 +609,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               style={{
                 fontSize: "11px",
                 color: "var(--text-secondary)",
-                fontWeight: "500",
+                fontWeight: "600",
+                letterSpacing: "0.2px",
+                padding: "3px 8px",
+                background: "rgba(255, 255, 255, 0.04)",
+                borderRadius: "4px",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
               }}
             >
-              Ahmedabad Metro EOC
+              GUJARAT METRO EOC
             </div>
 
             {/* Clock */}
@@ -610,14 +626,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "5px",
-                fontSize: "11px",
-                color: "var(--text-muted)",
+                gap: "6px",
+                fontSize: "11.5px",
+                color: "var(--text-primary)",
                 fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: "600",
               }}
             >
-              <Clock size={11} />
-              {mounted && currentTime ? currentTime.toLocaleTimeString("en-IN", { hour12: false }) : "--:--:--"}
+              <Clock size={12} color="#60a5fa" />
+              {mounted && currentTime
+                ? currentTime.toLocaleTimeString("en-IN", { hour12: false }) + " IST"
+                : "--:--:--"}
             </div>
 
             {/* Role badge */}

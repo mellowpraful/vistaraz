@@ -357,17 +357,20 @@ export default function IncidentsPage() {
                 key={incident.id}
                 style={{
                   background: "var(--bg-card)",
-                  borderTop: "1px solid var(--border-primary)",
-                  borderRight: "1px solid var(--border-primary)",
-                  borderBottom: "1px solid var(--border-primary)",
-                  borderLeft: `3px solid ${accentColor}`,
+                  borderStyle: "solid",
+                  borderTopWidth: "1px",
+                  borderRightWidth: "1px",
+                  borderBottomWidth: "1px",
+                  borderLeftWidth: "3px",
+                  borderTopColor: "var(--border-primary)",
+                  borderRightColor: "var(--border-primary)",
+                  borderBottomColor: "var(--border-primary)",
+                  borderLeftColor: accentColor,
                   borderRadius: "8px",
                   padding: "14px 16px",
                   transition: "all 0.2s",
                   animation: isCritical ? "glow-pulse 2s ease-in-out infinite" : undefined,
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border-secondary)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border-primary)"; }}
               >
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
                   {/* Left info */}

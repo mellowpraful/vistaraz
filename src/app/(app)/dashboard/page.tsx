@@ -8,6 +8,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/Card";
 import { LoadingState, SkeletonLine } from "@/components/ui/EmptyState";
+import { Skeleton, MetricCardSkeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import {
   AlertTriangle,
@@ -159,14 +160,14 @@ export default function DashboardPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="skeleton" style={{ height: "120px", borderRadius: "8px" }} />
+            <MetricCardSkeleton key={i} />
           ))}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "20px" }}>
-          <div className="skeleton" style={{ height: "400px", borderRadius: "8px" }} />
+          <div className="skeleton" style={{ height: "400px", borderRadius: "10px" }} />
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="skeleton" style={{ height: "180px", borderRadius: "8px" }} />
-            <div className="skeleton" style={{ height: "200px", borderRadius: "8px" }} />
+            <div className="skeleton" style={{ height: "180px", borderRadius: "10px" }} />
+            <div className="skeleton" style={{ height: "200px", borderRadius: "10px" }} />
           </div>
         </div>
       </div>
@@ -183,26 +184,32 @@ export default function DashboardPage() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "12px",
-            borderRadius: "8px",
+            gap: "14px",
+            borderRadius: "10px",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            background: "linear-gradient(90deg, rgba(127, 29, 29, 0.4) 0%, rgba(69, 10, 10, 0.25) 100%)",
+            backdropFilter: "blur(10px)",
+            padding: "14px 18px",
+            boxShadow: "0 0 20px rgba(239, 68, 68, 0.2)",
           }}
         >
           <div
             style={{
-              width: "36px",
-              height: "36px",
+              width: "38px",
+              height: "38px",
               borderRadius: "8px",
-              background: "#7f1d1d",
+              background: "#991b1b",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
+              boxShadow: "0 0 12px rgba(239, 68, 68, 0.4)",
             }}
           >
-            <AlertTriangle size={18} color="#f87171" />
+            <AlertTriangle size={20} color="#fef2f2" />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "13px", fontWeight: "700", color: "#fca5a5", marginBottom: "2px" }}>
+            <div style={{ fontSize: "13px", fontWeight: "800", color: "#fca5a5", letterSpacing: "0.4px", marginBottom: "2px" }}>
               {criticalIncidents.length} CRITICAL INCIDENT{criticalIncidents.length > 1 ? "S" : ""} ACTIVE
             </div>
             <div style={{ fontSize: "12px", color: "#f87171" }}>
@@ -215,32 +222,33 @@ export default function DashboardPage() {
               display: "flex",
               alignItems: "center",
               gap: "4px",
-              padding: "6px 14px",
-              background: "#7f1d1d",
-              border: "1px solid #991b1b",
+              padding: "7px 16px",
+              background: "#b91c1c",
+              border: "1px solid #ef4444",
               borderRadius: "6px",
-              color: "#fca5a5",
+              color: "#fff",
               fontSize: "12px",
-              fontWeight: "600",
+              fontWeight: "700",
               textDecoration: "none",
               flexShrink: 0,
               whiteSpace: "nowrap",
+              boxShadow: "0 0 10px rgba(239, 68, 68, 0.3)",
             }}
           >
-            View All <ChevronRight size={13} />
+            Review Priority <ChevronRight size={14} />
           </Link>
         </div>
       )}
 
       {/* ── Page Header ───────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
         <div>
-          <h1 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text-primary)", margin: 0 }}>
-            Command Center
+          <h1 style={{ fontSize: "24px", fontWeight: "800", color: "var(--text-primary)", letterSpacing: "-0.5px", margin: 0 }}>
+            Operations Command Center
           </h1>
-          <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-            Gujarat Emergency Operations Center —{" "}
-            <span suppressHydrationWarning>
+          <p style={{ fontSize: "12.5px", color: "var(--text-muted)", marginTop: "4px" }}>
+            State Emergency Operations System —{" "}
+            <span suppressHydrationWarning style={{ color: "var(--text-secondary)", fontWeight: "500" }}>
               {mounted && dateString ? dateString : "Emergency Operations Stream"}
             </span>
           </p>
@@ -250,7 +258,7 @@ export default function DashboardPage() {
             suppressHydrationWarning
             style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}
           >
-            Updated {mounted ? formatRelativeTime(lastUpdated) : "just now"}
+            Telemetry: {mounted ? formatRelativeTime(lastUpdated) : "live"}
           </span>
           <Button
             variant="secondary"
@@ -259,8 +267,26 @@ export default function DashboardPage() {
             loading={refreshing}
             icon={<RefreshCw size={12} />}
           >
-            Refresh
+            Sync
           </Button>
+          <Link
+            href="/ai-commander"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              background: "linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(126, 34, 206, 0.4) 100%)",
+              border: "1px solid rgba(168, 85, 247, 0.5)",
+              borderRadius: "6px",
+              color: "#e9d5ff",
+              fontSize: "12px",
+              fontWeight: "600",
+              textDecoration: "none",
+            }}
+          >
+            ⚡ AI Intelligence
+          </Link>
           <Link
             href="/incidents"
             style={{
@@ -268,13 +294,14 @@ export default function DashboardPage() {
               alignItems: "center",
               gap: "6px",
               padding: "7px 16px",
-              background: "var(--accent-blue)",
-              border: "none",
+              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+              border: "1px solid rgba(59, 130, 246, 0.4)",
               borderRadius: "6px",
               color: "#fff",
               fontSize: "12px",
               fontWeight: "600",
               textDecoration: "none",
+              boxShadow: "0 0 14px rgba(37, 99, 235, 0.3)",
             }}
           >
             <Plus size={13} />
@@ -294,27 +321,31 @@ export default function DashboardPage() {
             color="#ef4444"
             href="/incidents"
             pulse={data.incidents.active > 0}
+            trend={{ direction: data.incidents.active > 0 ? "up" : "stable", label: "Live CAD" }}
           />
           <MetricCard
             icon={<Shield size={18} />}
             value={data.resources.available}
-            label="Available Resources"
-            sub={`${data.resources.total} fleet`}
-            color="#22c55e"
+            label="Available Fleet"
+            sub={`${data.resources.total} units`}
+            color="#10b981"
             href="/resources"
+            trend={{ direction: "up", label: "Ready" }}
           />
           <MetricCard
             icon={<Zap size={18} />}
             value={data.pendingDispatches}
             label="Pending Dispatches"
+            sub="Awaiting review"
             color="#f97316"
             href="/dispatch"
             pulse={data.pendingDispatches > 0}
+            trend={{ direction: data.pendingDispatches > 0 ? "up" : "stable", label: "Queue" }}
           />
           <MetricCard
             icon={<Activity size={18} />}
             value={`${data.hospitals.occupancyRate}%`}
-            label="Hospital ICU Occupancy"
+            label="ICU Bed Occupancy"
             sub={`${data.hospitals.availableBeds} beds free`}
             color={
               parseFloat(data.hospitals.occupancyRate) > 80
@@ -324,6 +355,7 @@ export default function DashboardPage() {
                 : "#06b6d4"
             }
             href="/hospitals"
+            trend={{ direction: "stable", label: "Telemetry" }}
           />
         </div>
       )}
@@ -338,6 +370,7 @@ export default function DashboardPage() {
               style={{ textDecoration: "none" }}
             >
               <div
+                className="status-card-hover"
                 style={{
                   background: "var(--bg-card)",
                   border: "1px solid var(--border-primary)",
@@ -345,13 +378,7 @@ export default function DashboardPage() {
                   padding: "12px",
                   textAlign: "center",
                   cursor: "pointer",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "var(--border-secondary)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "var(--border-primary)";
+                  transition: "all 0.15s ease",
                 }}
               >
                 <div style={{ fontSize: "20px", fontWeight: "800", color: "var(--text-primary)" }}>
@@ -416,6 +443,7 @@ export default function DashboardPage() {
                   <Link
                     key={inc.id}
                     href={`/incidents/${inc.id}`}
+                    className="incident-feed-row"
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -423,14 +451,7 @@ export default function DashboardPage() {
                       padding: "12px 18px",
                       borderBottom: i < incidents.length - 1 ? "1px solid var(--border-primary)" : "none",
                       textDecoration: "none",
-                      transition: "background 0.15s",
                       borderLeft: `3px solid ${accentColor}`,
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "var(--bg-card-hover)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "transparent";
                     }}
                   >
                     <span style={{ fontSize: "18px", flexShrink: 0 }}>{icon}</span>
@@ -632,6 +653,7 @@ export default function DashboardPage() {
                 <Link
                   key={action.href}
                   href={action.href}
+                  className="quick-action-link"
                   style={{
                     padding: "9px 12px",
                     background: "var(--bg-secondary)",
@@ -644,17 +666,7 @@ export default function DashboardPage() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.borderColor = action.color + "60";
-                    (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
-                    (e.currentTarget as HTMLElement).style.background = action.color + "08";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "var(--border-primary)";
-                    (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
-                    (e.currentTarget as HTMLElement).style.background = "var(--bg-secondary)";
+                    transition: "all 0.15s ease",
                   }}
                 >
                   {action.label}

@@ -18,24 +18,42 @@ if (typeof window !== "undefined") {
 }
 
 // Custom SVG map icons
-const createCustomIcon = (emoji: string, bgColor: string) => {
+const createCustomIcon = (emoji: string, bgColor: string, isCritical?: boolean) => {
+  const pulseHtml = isCritical
+    ? `<div style="
+        position: absolute;
+        inset: -8px;
+        border-radius: 50%;
+        background: ${bgColor};
+        opacity: 0.4;
+        animation: radar-ring 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+        pointer-events: none;
+      "></div>`
+    : "";
+
   return L.divIcon({
     className: "custom-map-pin",
-    html: `<div style="
-      background-color: ${bgColor};
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.5), 0 0 15px ${bgColor};
-      border: 2px solid white;
-      cursor: pointer;
-    ">${emoji}</div>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
+    html: `<div style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+      ${pulseHtml}
+      <div style="
+        background-color: ${bgColor};
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.6), 0 0 12px ${bgColor}80;
+        border: 2px solid #ffffff;
+        cursor: pointer;
+        position: relative;
+        z-index: 2;
+        transition: transform 0.15s ease;
+      ">${emoji}</div>
+    </div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
     popupAnchor: [0, -20],
   });
 };
@@ -235,7 +253,8 @@ export default function SituationMap({
         safeIncidents.map((inc) => {
           const icon = createCustomIcon(
             INCIDENT_TYPE_ICONS[inc.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨",
-            getIncidentBg(inc.severity)
+            getIncidentBg(inc.severity),
+            inc.severity === "CRITICAL"
           );
 
           return (

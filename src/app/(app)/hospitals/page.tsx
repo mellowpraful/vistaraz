@@ -106,11 +106,14 @@ export default function HospitalsPage() {
     }
   };
 
-  const totalBeds = hospitals.reduce((acc, h) => acc + h.totalBeds, 0);
-  const totalAvailableBeds = hospitals.reduce((acc, h) => acc + h.availableBeds, 0);
-  const totalIcuAvailable = hospitals.reduce((acc, h) => acc + h.icuBedsAvailable, 0);
-  const totalShelterCapacity = shelters.reduce((acc, s) => acc + s.capacity, 0);
-  const totalShelterOccupancy = shelters.reduce((acc, s) => acc + s.currentOccupancy, 0);
+  const totalBeds = hospitals.reduce((acc, h) => acc + (h.totalBeds || 0), 0);
+  const totalAvailableBeds = hospitals.reduce((acc, h) => acc + (h.availableBeds || 0), 0);
+  const totalIcuAvailable = hospitals.reduce(
+    (acc, h) => acc + (h.icuBedsAvailable ?? (h as any).availableIcu ?? 0),
+    0
+  );
+  const totalShelterCapacity = shelters.reduce((acc, s) => acc + (s.capacity || 0), 0);
+  const totalShelterOccupancy = shelters.reduce((acc, s) => acc + (s.currentOccupancy || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -157,7 +160,7 @@ export default function HospitalsPage() {
             {totalShelterOccupancy} / {totalShelterCapacity}
           </div>
           <div className="text-[10px] text-slate-400">
-            {totalShelterCapacity - totalShelterOccupancy} Vacancies
+            {Math.max(0, totalShelterCapacity - totalShelterOccupancy)} Vacancies
           </div>
         </div>
 
@@ -181,10 +184,16 @@ export default function HospitalsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {hospitals.map((hosp) => {
+              const total = hosp.totalBeds || 1;
+              const avail = hosp.availableBeds ?? 0;
               const occupancyPct = Math.round(
-                ((hosp.totalBeds - hosp.availableBeds) / hosp.totalBeds) * 100
+                ((total - avail) / total) * 100
               );
               const isHighOccupancy = occupancyPct >= 85;
+              const icuAvail = hosp.icuBedsAvailable ?? (hosp as any).availableIcu ?? 0;
+              const icuTot = hosp.icuBedsTotal ?? (hosp as any).icuBeds ?? icuAvail;
+              const burnAvail = hosp.burnBedsAvailable ?? (hosp as any).availableBurn ?? (hosp as any).burnBeds ?? 0;
+              const bloodAvail = hosp.bloodBagsAvailable ?? (hosp as any).bloodBags ?? 16;
 
               return (
                 <div
@@ -215,12 +224,12 @@ export default function HospitalsPage() {
                     <div className="flex justify-between text-xs font-mono">
                       <span className="text-slate-400">General Bed Occupancy</span>
                       <span className="text-slate-200 font-bold">
-                        {hosp.availableBeds} Available / {hosp.totalBeds} Total
+                        {avail} Available / {total} Total
                       </span>
                     </div>
                     <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
                       <div
-                        style={{ width: `${occupancyPct}%` }}
+                        style={{ width: `${Math.min(100, Math.max(0, occupancyPct))}%` }}
                         className={`h-full transition-all duration-300 ${
                           isHighOccupancy ? "bg-amber-500" : "bg-blue-500"
                         }`}
@@ -233,19 +242,19 @@ export default function HospitalsPage() {
                     <div className="p-2 bg-slate-950 rounded border border-slate-800">
                       <div className="text-[10px] text-slate-500 uppercase">ICU Beds</div>
                       <div className="text-sm font-bold text-blue-400 mt-0.5">
-                        {hosp.icuBedsAvailable} / {hosp.icuBedsTotal}
+                        {icuAvail} / {icuTot}
                       </div>
                     </div>
                     <div className="p-2 bg-slate-950 rounded border border-slate-800">
                       <div className="text-[10px] text-slate-500 uppercase">Burn Units</div>
                       <div className="text-sm font-bold text-purple-400 mt-0.5">
-                        {hosp.burnBedsAvailable} Ready
+                        {burnAvail} Ready
                       </div>
                     </div>
                     <div className="p-2 bg-slate-950 rounded border border-slate-800">
                       <div className="text-[10px] text-slate-500 uppercase">Blood Reserves</div>
                       <div className="text-sm font-bold text-red-400 mt-0.5">
-                        {hosp.bloodBagsAvailable} Units
+                        {bloodAvail} Units
                       </div>
                     </div>
                   </div>

@@ -1,5 +1,6 @@
 import React from "react";
 import { LucideIcon } from "lucide-react";
+import { Button } from "./Button";
 
 interface EmptyStateProps {
   icon?: LucideIcon;
@@ -19,60 +20,53 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "60px 24px",
+        padding: "64px 24px",
         textAlign: "center",
-        gap: "12px",
+        gap: "14px",
+        background: "linear-gradient(145deg, rgba(12, 19, 36, 0.6) 0%, rgba(7, 11, 22, 0.7) 100%)",
+        borderRadius: "12px",
+        border: "1px dashed rgba(255, 255, 255, 0.1)",
+        backdropFilter: "blur(12px)",
       }}
     >
       {Icon && (
         <div
           style={{
-            width: "56px",
-            height: "56px",
-            borderRadius: "12px",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border-primary)",
+            width: "60px",
+            height: "60px",
+            borderRadius: "14px",
+            background: "linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(15, 23, 42, 0.8) 100%)",
+            border: "1px solid rgba(59, 130, 246, 0.3)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             marginBottom: "4px",
+            boxShadow: "0 0 20px rgba(37, 99, 235, 0.2)",
           }}
         >
-          <Icon size={24} color="var(--text-muted)" />
+          <Icon size={26} color="#60a5fa" />
         </div>
       )}
-      <div style={{ fontSize: "15px", fontWeight: "600", color: "var(--text-secondary)" }}>
+      <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", letterSpacing: "-0.3px" }}>
         {title}
       </div>
       {description && (
-        <p style={{ fontSize: "13px", color: "var(--text-muted)", maxWidth: "320px", lineHeight: "1.6" }}>
+        <p style={{ fontSize: "13px", color: "var(--text-secondary)", maxWidth: "360px", lineHeight: "1.6", margin: 0 }}>
           {description}
         </p>
       )}
       {action && (
-        <button
-          onClick={action.onClick}
-          style={{
-            marginTop: "8px",
-            padding: "8px 18px",
-            background: "var(--accent-blue)",
-            border: "none",
-            borderRadius: "6px",
-            color: "#fff",
-            fontSize: "13px",
-            fontWeight: "600",
-            cursor: "pointer",
-            transition: "all 0.15s",
-          }}
-        >
-          {action.label}
-        </button>
+        <div style={{ marginTop: "6px" }}>
+          <Button variant="primary" size="md" onClick={action.onClick}>
+            {action.label}
+          </Button>
+        </div>
       )}
     </div>
   );
 }
 
-export function LoadingState({ label = "Loading..." }: { label?: string }) {
+export function LoadingState({ label = "Synchronizing Command Stream..." }: { label?: string }) {
   return (
     <div
       style={{
@@ -81,23 +75,44 @@ export function LoadingState({ label = "Loading..." }: { label?: string }) {
         alignItems: "center",
         justifyContent: "center",
         padding: "60px 24px",
-        gap: "14px",
+        gap: "16px",
       }}
     >
       <div
         style={{
-          width: "36px",
-          height: "36px",
-          borderRadius: "50%",
-          borderWidth: "3px",
-          borderStyle: "solid",
-          borderColor: "var(--border-primary)",
-          borderTopColor: "var(--accent-blue)",
-          animation: "spin 0.8s linear infinite",
+          position: "relative",
+          width: "44px",
+          height: "44px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
-      />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>{label}</div>
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "50%",
+            borderWidth: "2px",
+            borderStyle: "solid",
+            borderColor: "rgba(59, 130, 246, 0.15)",
+            borderTopColor: "#3b82f6",
+            animation: "spin 0.9s linear infinite",
+          }}
+        />
+        <div
+          style={{
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            background: "#60a5fa",
+            boxShadow: "0 0 10px #3b82f6",
+          }}
+        />
+      </div>
+      <div style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: "500", letterSpacing: "0.2px" }}>
+        {label}
+      </div>
     </div>
   );
 }
@@ -106,7 +121,7 @@ export function SkeletonLine({ width = "100%", height = "14px" }: { width?: stri
   return (
     <div
       className="skeleton"
-      style={{ width, height, borderRadius: "4px", marginBottom: "6px" }}
+      style={{ width, height, borderRadius: "5px", marginBottom: "6px" }}
     />
   );
 }
