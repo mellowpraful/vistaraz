@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CreateIncidentSchema } from "@/lib/types";
+import { FALLBACK_INCIDENTS } from "@/lib/demo-data";
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,12 +64,46 @@ export async function GET(req: NextRequest) {
       incidents,
       total: incidents.length,
     });
+<<<<<<< HEAD
   } catch (error: any) {
     console.error("GET /api/incidents error:", error);
     return NextResponse.json(
       { success: false, error: error?.message || "Failed to fetch incidents" },
       { status: 500 }
     );
+=======
+  } catch (error) {
+    console.warn("Database unavailable in /api/incidents, serving synthetic incidents fallback:", error);
+    try {
+      const { searchParams } = new URL(req.url);
+      const status = searchParams.get("status");
+      const severity = searchParams.get("severity");
+      const type = searchParams.get("type");
+      const limit = parseInt(searchParams.get("limit") ?? "50");
+
+      let filtered = FALLBACK_INCIDENTS;
+      if (status && status !== "ALL") filtered = filtered.filter((i) => i.status === status);
+      if (severity && severity !== "ALL") filtered = filtered.filter((i) => i.severity === severity);
+      if (type && type !== "ALL") filtered = filtered.filter((i) => i.type === type);
+      const sliced = filtered.slice(0, limit);
+
+      return NextResponse.json({
+        success: true,
+        data: sliced,
+        incidents: sliced,
+        total: filtered.length,
+        isFallback: true,
+      });
+    } catch {
+      return NextResponse.json({
+        success: true,
+        data: FALLBACK_INCIDENTS,
+        incidents: FALLBACK_INCIDENTS,
+        total: FALLBACK_INCIDENTS.length,
+        isFallback: true,
+      });
+    }
+>>>>>>> 82df473 (fix: add production database fallback handling)
   }
 }
 

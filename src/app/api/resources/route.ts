@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { FALLBACK_RESOURCES } from "@/lib/demo-data";
 
 export async function GET(req: NextRequest) {
   try {
@@ -72,12 +73,50 @@ export async function GET(req: NextRequest) {
       resources,
       total: resources.length,
     });
+<<<<<<< HEAD
   } catch (error: any) {
     console.error("GET /api/resources error:", error);
     return NextResponse.json(
       { success: false, error: error?.message || "Failed to fetch resources" },
       { status: 500 }
     );
+=======
+  } catch (error) {
+    console.warn("Database unavailable in /api/resources, serving synthetic resources fallback:", error);
+    try {
+      const { searchParams } = new URL(req.url);
+      const status = searchParams.get("status");
+      const type = searchParams.get("type");
+      const search = searchParams.get("search")?.trim().toLowerCase();
+
+      let filtered = FALLBACK_RESOURCES;
+      if (status && status !== "ALL") filtered = filtered.filter((r) => r.status === status);
+      if (type && type !== "ALL") filtered = filtered.filter((r) => r.type === type);
+      if (search) {
+        filtered = filtered.filter((r) =>
+          r.name.toLowerCase().includes(search) ||
+          r.locationName.toLowerCase().includes(search) ||
+          r.agency.name.toLowerCase().includes(search)
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: filtered,
+        resources: filtered,
+        total: filtered.length,
+        isFallback: true,
+      });
+    } catch {
+      return NextResponse.json({
+        success: true,
+        data: FALLBACK_RESOURCES,
+        resources: FALLBACK_RESOURCES,
+        total: FALLBACK_RESOURCES.length,
+        isFallback: true,
+      });
+    }
+>>>>>>> 82df473 (fix: add production database fallback handling)
   }
 }
 

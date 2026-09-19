@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { FALLBACK_HOSPITALS } from "@/lib/demo-data";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,8 +22,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: hospitals });
   } catch (error) {
-    console.error("GET /api/hospitals error:", error);
-    return NextResponse.json({ success: false, error: "Failed to fetch hospitals" }, { status: 500 });
+    console.warn("Database unavailable in /api/hospitals, serving synthetic hospitals fallback:", error);
+    return NextResponse.json({ success: true, data: FALLBACK_HOSPITALS, isFallback: true });
   }
 }
 

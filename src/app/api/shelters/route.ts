@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { FALLBACK_SHELTERS } from "@/lib/demo-data";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,8 +22,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: shelters });
   } catch (error) {
-    console.error("GET /api/shelters error:", error);
-    return NextResponse.json({ success: false, error: "Failed to fetch shelters" }, { status: 500 });
+    console.warn("Database unavailable in /api/shelters, serving synthetic shelters fallback:", error);
+    return NextResponse.json({ success: true, data: FALLBACK_SHELTERS, isFallback: true });
   }
 }
 
