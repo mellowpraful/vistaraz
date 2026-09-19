@@ -18,10 +18,15 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
 
-    return NextResponse.json({ logs, total: logs.length });
+    return NextResponse.json({
+      success: true,
+      data: logs,
+      logs,
+      total: logs.length,
+    });
   } catch (error) {
     console.error("GET /api/audit error:", error);
-    return NextResponse.json({ error: "Failed to fetch audit logs" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to fetch audit logs" }, { status: 500 });
   }
 }
 
@@ -38,10 +43,11 @@ export async function POST(req: NextRequest) {
         after: body.after ? JSON.stringify(body.after) : null,
         metadata: body.metadata ? JSON.stringify(body.metadata) : null,
       },
+      include: { user: { select: { name: true, role: true } } },
     });
-    return NextResponse.json({ log }, { status: 201 });
+    return NextResponse.json({ success: true, data: log, log }, { status: 201 });
   } catch (error) {
     console.error("POST /api/audit error:", error);
-    return NextResponse.json({ error: "Failed to create audit log" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to create audit log" }, { status: 500 });
   }
 }

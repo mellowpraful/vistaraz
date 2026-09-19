@@ -64,3 +64,34 @@ export function formatDuration(seconds: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
+/**
+ * Robust helper to extract an array payload from API responses regardless of shape
+ * (supports { data: [...] }, { incidents: [...] }, { resources: [...] }, { logs: [...] }, or raw array).
+ */
+export function extractApiData<T>(json: any): T[] {
+  if (!json) return [];
+  if (Array.isArray(json)) return json as T[];
+  if (Array.isArray(json.data)) return json.data as T[];
+  if (Array.isArray(json.incidents)) return json.incidents as T[];
+  if (Array.isArray(json.resources)) return json.resources as T[];
+  if (Array.isArray(json.hospitals)) return json.hospitals as T[];
+  if (Array.isArray(json.shelters)) return json.shelters as T[];
+  if (Array.isArray(json.logs)) return json.logs as T[];
+  if (Array.isArray(json.recommendations)) return json.recommendations as T[];
+  return [];
+}
+
+/**
+ * Robust helper to extract a single object payload from API responses.
+ */
+export function extractApiItem<T>(json: any): T | null {
+  if (!json) return null;
+  if (json.data && typeof json.data === "object" && !Array.isArray(json.data)) return json.data as T;
+  if (json.incident && typeof json.incident === "object") return json.incident as T;
+  if (json.resource && typeof json.resource === "object") return json.resource as T;
+  if (json.log && typeof json.log === "object") return json.log as T;
+  if (typeof json === "object" && !Array.isArray(json) && !("success" in json && !json.success)) return json as T;
+  return null;
+}
+
+

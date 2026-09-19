@@ -117,6 +117,19 @@ async function runTests() {
   assert(extractionResult.severity === "CRITICAL" || extractionResult.severity === "HIGH", "AI accurately assigns high/critical severity");
   assert((extractionResult.affectedCount ?? 0) >= 20 || (extractionResult.affectedCount ?? 0) > 0, "AI extracts affected person count");
 
+  // ─── 6. Data Consistency API Envelope Tests ─────────────────
+  console.log("\n🔹 6. Data Consistency & API Envelope Tests");
+  const { extractApiData, extractApiItem } = await import("../src/lib/utils");
+  const shape1 = { success: true, data: [{ id: "1" }] };
+  const shape2 = { incidents: [{ id: "2" }], total: 1 };
+  const shape3 = { resources: [{ id: "3" }] };
+
+  assert(extractApiData(shape1).length === 1 && extractApiData(shape1)[0].id === "1", "Extracts from { success: true, data: [...] } envelope");
+  assert(extractApiData(shape2).length === 1 && extractApiData(shape2)[0].id === "2", "Extracts from legacy { incidents: [...] } shape");
+  assert(extractApiData(shape3).length === 1 && extractApiData(shape3)[0].id === "3", "Extracts from legacy { resources: [...] } shape");
+  assert(extractApiItem<{ id: string }>({ data: { id: "item-1" } })?.id === "item-1", "Extracts item from object wrapper");
+
+
   // ─── Summary ────────────────────────────────────────────────
   console.log("\n" + "─".repeat(50));
   console.log(`📊 Test Results: ${passed} Passed, ${failed} Failed`);

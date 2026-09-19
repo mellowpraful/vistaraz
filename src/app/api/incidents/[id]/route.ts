@@ -15,11 +15,11 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         reports: { orderBy: { createdAt: "desc" } },
         events: { orderBy: { createdAt: "asc" } },
         assignments: {
-          include: { resource: { include: { capabilities: true } } },
+          include: { resource: { include: { capabilities: true, agency: true } } },
         },
         recommendations: {
           include: {
-            resource: { include: { capabilities: true } },
+            resource: { include: { capabilities: true, agency: true } },
             approvals: { include: { user: true } },
           },
           orderBy: { rank: "asc" },
@@ -30,13 +30,13 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     });
 
     if (!incident) {
-      return NextResponse.json({ error: "Incident not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Incident not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ incident });
+    return NextResponse.json({ success: true, data: incident, incident });
   } catch (error) {
     console.error("GET /api/incidents/[id] error:", error);
-    return NextResponse.json({ error: "Failed to fetch incident" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to fetch incident" }, { status: 500 });
   }
 }
 
@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
     const incident = await prisma.incident.findUnique({ where: { id } });
     if (!incident) {
-      return NextResponse.json({ error: "Incident not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Incident not found" }, { status: 404 });
     }
 
     // Status update
@@ -58,6 +58,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       if (!allowedTransitions.includes(validated.status)) {
         return NextResponse.json(
           {
+            success: false,
             error: `Invalid status transition from ${incident.status} to ${validated.status}`,
             allowed: allowedTransitions,
           },
@@ -68,6 +69,11 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       const updated = await prisma.incident.update({
         where: { id },
         data: { status: validated.status },
+        include: {
+          events: { orderBy: { createdAt: "asc" } },
+          assignments: { include: { resource: { include: { capabilities: true, agency: true } } } },
+          recommendations: { include: { resource: { include: { agency: true } } } },
+        },
       });
 
       // Event log
@@ -93,10 +99,10 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
         },
       });
 
-      return NextResponse.json({ incident: updated });
+      return NextResponse.json({ success: true, data: updated, incident: updated });
     }
 
-    // General update (title, description, location etc.)
+    // General update
     const {
       title, description, severity, locationName,
       latitude, longitude, affectedCount, injuryCount,
@@ -119,6 +125,11 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
           requiredCapabilities: JSON.stringify(requiredCapabilities),
         }),
       },
+      include: {
+        events: { orderBy: { createdAt: "asc" } },
+        assignments: { include: { resource: { include: { agency: true } } } },
+        recommendations: { include: { resource: { include: { agency: true } } } },
+      },
     });
 
     await prisma.incidentEvent.create({
@@ -130,12 +141,12 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return NextResponse.json({ incident: updated });
+    return NextResponse.json({ success: true, data: updated, incident: updated });
   } catch (error: any) {
     if (error?.name === "ZodError") {
-      return NextResponse.json({ error: "Validation failed", details: error.errors }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Validation failed", details: error.errors }, { status: 400 });
     }
     console.error("PATCH /api/incidents/[id] error:", error);
-    return NextResponse.json({ error: "Failed to update incident" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to update incident" }, { status: 500 });
   }
 }

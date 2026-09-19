@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         ...(status ? { status: status as any } : {}),
         ...(severity ? { severity: severity as any } : {}),
         ...(type ? { type: type as any } : {}),
-        simulationId: simulationId ?? null, // null = live, string = simulation
+        simulationId: simulationId ?? null, // null = live data only
       },
       include: {
         events: { orderBy: { createdAt: "desc" }, take: 5 },
@@ -27,10 +27,15 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
 
-    return NextResponse.json({ incidents, total: incidents.length });
+    return NextResponse.json({
+      success: true,
+      data: incidents,
+      incidents,
+      total: incidents.length,
+    });
   } catch (error) {
     console.error("GET /api/incidents error:", error);
-    return NextResponse.json({ error: "Failed to fetch incidents" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to fetch incidents" }, { status: 500 });
   }
 }
 
@@ -58,7 +63,12 @@ export async function POST(req: NextRequest) {
           : null,
         language: validated.language ?? "en",
         originalReport: validated.originalReport,
-        simulationId: null, // live data only
+        simulationId: null, // live data
+      },
+      include: {
+        events: true,
+        assignments: { include: { resource: true } },
+        recommendations: true,
       },
     });
 
@@ -84,12 +94,18 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ incident }, { status: 201 });
+    return NextResponse.json(
+      { success: true, data: incident, incident },
+      { status: 201 }
+    );
   } catch (error: any) {
     if (error?.name === "ZodError") {
-      return NextResponse.json({ error: "Validation failed", details: error.errors }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Validation failed", details: error.errors },
+        { status: 400 }
+      );
     }
     console.error("POST /api/incidents error:", error);
-    return NextResponse.json({ error: "Failed to create incident" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to create incident" }, { status: 500 });
   }
 }
