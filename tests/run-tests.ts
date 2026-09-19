@@ -130,6 +130,103 @@ async function runTests() {
   assert(extractApiItem<{ id: string }>({ data: { id: "item-1" } })?.id === "item-1", "Extracts item from object wrapper");
 
 
+  // ─── 7. Resource Fleet & Equipment Parser Tests ────────────
+  console.log("\n🔹 7. Resource Fleet & Equipment Parser Tests");
+  const { parseEquipment, getTelemetryFreshness } = await import("../src/lib/utils");
+
+  const jsonEquip = JSON.stringify(["Defibrillator", "Oxygen Tank", "IV Kit"]);
+  const parsedJson = parseEquipment(jsonEquip);
+  assert(parsedJson.length === 3 && parsedJson[0] === "Defibrillator", "Parses JSON array equipment string correctly");
+
+  const commaEquip = "Stretcher, Monitor, Defibrillator";
+  const parsedComma = parseEquipment(commaEquip);
+  assert(parsedComma.length === 3 && parsedComma[1] === "Monitor", "Parses comma-separated equipment string");
+
+  const singleEquip = "Advanced Thermal Camera";
+  const parsedSingle = parseEquipment(singleEquip);
+  assert(parsedSingle.length === 1 && parsedSingle[0] === "Advanced Thermal Camera", "Parses single equipment string");
+
+  assert(parseEquipment(null).length === 0, "Handles null equipment gracefully");
+  assert(parseEquipment("").length === 0, "Handles empty equipment gracefully");
+
+  // Telemetry freshness tests
+  const now = new Date();
+  const liveDate = new Date(now.getTime() - 5 * 60 * 1000); // 5 min ago
+  const recentDate = new Date(now.getTime() - 45 * 60 * 1000); // 45 min ago
+  const staleDate = new Date(now.getTime() - 5 * 3600 * 1000); // 5 hours ago
+
+  const liveRes = getTelemetryFreshness(liveDate);
+  assert(liveRes.status === "live" && !liveRes.isStale, "Identifies live telemetry (<= 15m)");
+
+  const recentRes = getTelemetryFreshness(recentDate);
+  assert(recentRes.status === "recent" && !recentRes.isStale, "Identifies recent telemetry (<= 120m)");
+
+  const staleRes = getTelemetryFreshness(staleDate);
+  assert(staleRes.status === "stale" && staleRes.isStale, "Identifies stale telemetry (> 120m)");
+
+  const unknownRes = getTelemetryFreshness(null);
+  assert(unknownRes.status === "unknown" && unknownRes.isStale, "Handles missing telemetry timestamp");
+
+  // ─── 8. Resource Fleet Filtering Tests ───────────────────────
+  console.log("\n🔹 8. Resource Fleet Filtering Algorithm Tests");
+  const fleetData = [
+    {
+      id: "res-1",
+      name: "AMB-001 (ALS)",
+      type: "AMBULANCE",
+      status: "AVAILABLE",
+      agency: { name: "108 Emergency Medical Services" },
+      capabilities: [{ capability: "TRAUMA_CARE", equipment: JSON.stringify(["Defibrillator", "Oxygen"]) }],
+      assignments: [],
+    },
+    {
+      id: "res-2",
+      name: "FE-001 (Heavy Fire)",
+      type: "FIRE_ENGINE",
+      status: "DISPATCHED",
+      agency: { name: "Ahmedabad Fire & Emergency Services" },
+      capabilities: [{ capability: "FIRE_SUPPRESSION", equipment: JSON.stringify(["Water Tank", "Foam"]) }],
+      assignments: [{ incident: { title: "Chemical Plant Fire" } }],
+    },
+    {
+      id: "res-3",
+      name: "NDRF-BOAT-01",
+      type: "BOAT",
+      status: "STANDBY",
+      agency: { name: "NDRF Battalion 6" },
+      capabilities: [{ capability: "WATER_RESCUE", equipment: "Life Jackets, Inflatable Boat" }],
+      assignments: [],
+    },
+    {
+      id: "res-4",
+      name: "AMB-004 (OOS)",
+      type: "AMBULANCE",
+      status: "OUT_OF_SERVICE",
+      agency: { name: "108 Emergency Medical Services" },
+      capabilities: [{ capability: "PATIENT_TRANSPORT", equipment: null }],
+      assignments: [],
+    },
+  ];
+
+  const filterByStatus = fleetData.filter((r) => r.status === "AVAILABLE");
+  assert(filterByStatus.length === 1 && filterByStatus[0].id === "res-1", "Filters fleet by AVAILABLE status correctly");
+
+  const filterByType = fleetData.filter((r) => r.type === "AMBULANCE");
+  assert(filterByType.length === 2, "Filters fleet by AMBULANCE resource type");
+
+  const filterByAgency = fleetData.filter((r) => r.agency.name.includes("NDRF"));
+  assert(filterByAgency.length === 1 && filterByAgency[0].id === "res-3", "Filters fleet by Agency");
+
+  const searchByEquipment = fleetData.filter((r) =>
+    r.capabilities.some((c) => parseEquipment(c.equipment).some((eq) => eq.toLowerCase().includes("defibrillator")))
+  );
+  assert(searchByEquipment.length === 1 && searchByEquipment[0].id === "res-1", "Searches resources by verified equipment tag");
+
+  const searchByMission = fleetData.filter((r) =>
+    r.assignments.some((a) => a.incident?.title.toLowerCase().includes("chemical"))
+  );
+  assert(searchByMission.length === 1 && searchByMission[0].id === "res-2", "Searches resources by active mission title");
+
   // ─── Summary ────────────────────────────────────────────────
   console.log("\n" + "─".repeat(50));
   console.log(`📊 Test Results: ${passed} Passed, ${failed} Failed`);
@@ -141,3 +238,4 @@ async function runTests() {
 }
 
 runTests();
+

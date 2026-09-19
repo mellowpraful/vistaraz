@@ -1,42 +1,26 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { formatRelativeTime, extractApiData } from "@/lib/utils";
-
-interface Resource {
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-  latitude: number | null;
-  longitude: number | null;
-  capacity: number | null;
-  fuelPercent: number | null;
-  agency: {
-    id: string;
-    name: string;
-    type: string;
-  };
-  capabilities: Array<{
-    id: string;
-    capability: string;
-    rating: number;
-  }>;
-  assignments: Array<{
-    id: string;
-    status: string;
-    assignedAt: string;
-    incident: {
-      id: string;
-      title: string;
-      severity: string;
-    };
-  }>;
-}
+import { extractApiData, parseEquipment } from "@/lib/utils";
+import { ResourceItem, ResourceStatusModal } from "@/components/resources/ResourceStatusModal";
+import { ResourceCard } from "@/components/resources/ResourceCard";
+import { ResourceTableView } from "@/components/resources/ResourceTableView";
+import { ResourceFilterBar } from "@/components/resources/ResourceFilterBar";
+import { ResourceStatsOverview } from "@/components/resources/ResourceStatsOverview";
+import { EmptyState, LoadingState } from "@/components/ui/EmptyState";
+import {
+  RotateCcw,
+  Shield,
+  Radio,
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  Wifi,
+  Sparkles,
+} from "lucide-react";
 
 const RESOURCE_TYPES = [
-  "ALL",
   "AMBULANCE",
   "FIRE_ENGINE",
   "RESCUE_TEAM",
@@ -47,296 +31,372 @@ const RESOURCE_TYPES = [
   "RELIEF_VEHICLE",
   "HELICOPTER",
   "HAZMAT_UNIT",
+  "SEARCH_DOG_UNIT",
+  "SPECIALIZED",
 ];
 
 const RESOURCE_STATUSES = [
-  "ALL",
   "AVAILABLE",
   "DISPATCHED",
   "EN_ROUTE",
   "ON_SCENE",
   "RETURNING",
+  "STANDBY",
   "OUT_OF_SERVICE",
 ];
 
 export default function ResourcesPage() {
-  const [resources, setResources] = useState<Resource[]>([]);
+  const [resources, setResources] = useState<ResourceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedAgency, setSelectedAgency] = useState("ALL");
   const [selectedType, setSelectedType] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCapability, setSelectedCapability] = useState("ALL");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
+  // Modal & Quick Status state
+  const [modalResource, setModalResource] = useState<ResourceItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  const fetchResources = useCallback(async () => {
+  // Fetch live resources
+  const fetchResources = useCallback(async (isManual = false) => {
+    if (isManual) setIsRefreshing(true);
+    setFetchError(null);
     try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (selectedStatus !== "ALL") params.set("status", selectedStatus);
-
-      const res = await fetch(`/api/resources?${params.toString()}`);
+      const res = await fetch("/api/resources");
+      if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
       const json = await res.json();
-      setResources(extractApiData<Resource>(json));
-    } catch (err) {
+      const extracted = extractApiData<ResourceItem>(json);
+      setResources(extracted);
+      setLastRefreshed(new Date());
+    } catch (err: any) {
       console.error("Failed to load resources:", err);
+      setFetchError(err.message || "Failed to fetch resource fleet data");
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, [selectedStatus]);
+  }, []);
 
   useEffect(() => {
     fetchResources();
+    // Auto-refresh telemetry every 25 seconds
+    const interval = setInterval(() => {
+      fetchResources();
+    }, 25000);
+    return () => clearInterval(interval);
   }, [fetchResources]);
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
+  // Derive unique agencies and capabilities for filters
+  const agenciesList = useMemo(() => {
+    const set = new Set<string>();
+    resources.forEach((r) => {
+      if (r.agency?.name) set.add(r.agency.name);
+    });
+    return Array.from(set).sort();
+  }, [resources]);
+
+  const capabilitiesList = useMemo(() => {
+    const set = new Set<string>();
+    resources.forEach((r) => {
+      r.capabilities?.forEach((c) => {
+        if (c.capability) set.add(c.capability);
+      });
+    });
+    return Array.from(set).sort();
+  }, [resources]);
+
+  // Quick Status Transition Handler
+  const handleQuickStatusChange = async (id: string, newStatus: string): Promise<boolean> => {
     setUpdatingId(id);
+    setFeedbackMessage(null);
     try {
       const res = await fetch("/api/resources", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status: newStatus }),
       });
+
       const json = await res.json();
-      if (json.success) {
-        fetchResources();
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to update status");
       }
-    } catch (err) {
-      console.error("Failed to update resource status:", err);
+
+      // Update state locally & refresh
+      const updated = json.data || json.resource;
+      setResources((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, ...updated, lastUpdated: new Date().toISOString() } : r))
+      );
+
+      setFeedbackMessage({
+        type: "success",
+        text: `Unit status successfully updated to ${newStatus.replace(/_/g, " ")}`,
+      });
+
+      // Clear feedback after 4 seconds
+      setTimeout(() => setFeedbackMessage(null), 4000);
+      return true;
+    } catch (err: any) {
+      console.error("Quick status update error:", err);
+      setFeedbackMessage({
+        type: "error",
+        text: `Status change failed: ${err.message || "Network error"}. Live state preserved.`,
+      });
+      setTimeout(() => setFeedbackMessage(null), 6000);
+      return false;
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const filteredResources = resources.filter((r) => {
-    if (selectedType !== "ALL" && r.type !== selectedType) return false;
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      r.name.toLowerCase().includes(q) ||
-      r.agency.name.toLowerCase().includes(q) ||
-      r.type.toLowerCase().includes(q)
+  const handleModalStatusUpdated = (updatedResource: ResourceItem) => {
+    setResources((prev) =>
+      prev.map((r) => (r.id === updatedResource.id ? { ...r, ...updatedResource } : r))
     );
-  });
+    setFeedbackMessage({
+      type: "success",
+      text: `${updatedResource.name} updated to ${String(updatedResource.status).replace(/_/g, " ")}`,
+    });
+    setTimeout(() => setFeedbackMessage(null), 4000);
+  };
 
-  const availableCount = resources.filter((r) => r.status === "AVAILABLE").length;
-  const deployedCount = resources.filter((r) =>
-    ["DISPATCHED", "EN_ROUTE", "ON_SCENE"].includes(r.status)
-  ).length;
-  const maintenanceCount = resources.filter((r) => r.status === "OUT_OF_SERVICE").length;
+  const handleOpenStatusModal = (resource: ResourceItem) => {
+    setModalResource(resource);
+    setIsModalOpen(true);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setSelectedAgency("ALL");
+    setSelectedType("ALL");
+    setSelectedStatus("ALL");
+    setSelectedCapability("ALL");
+  };
+
+  // Filter logic
+  const filteredResources = useMemo(() => {
+    return resources.filter((r) => {
+      // Type Filter
+      if (selectedType !== "ALL" && r.type !== selectedType) return false;
+
+      // Status Filter
+      if (selectedStatus !== "ALL" && r.status !== selectedStatus) return false;
+
+      // Agency Filter
+      if (selectedAgency !== "ALL" && r.agency?.name !== selectedAgency) return false;
+
+      // Capability Filter
+      if (selectedCapability !== "ALL") {
+        const hasCap = r.capabilities?.some((c) => c.capability === selectedCapability);
+        if (!hasCap) return false;
+      }
+
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const nameMatch = r.name.toLowerCase().includes(q);
+        const typeMatch = r.type.toLowerCase().includes(q);
+        const agencyMatch = r.agency?.name?.toLowerCase().includes(q);
+        const locMatch = r.locationName?.toLowerCase().includes(q);
+        const capMatch = r.capabilities?.some((c) => c.capability.toLowerCase().includes(q));
+        const equipMatch = r.capabilities?.some((c) => {
+          const eqList = parseEquipment(c.equipment);
+          return eqList.some((eq) => eq.toLowerCase().includes(q));
+        });
+        const missionMatch = r.assignments?.some((a) =>
+          a.incident?.title?.toLowerCase().includes(q)
+        );
+
+        if (
+          !nameMatch &&
+          !typeMatch &&
+          !agencyMatch &&
+          !locMatch &&
+          !capMatch &&
+          !equipMatch &&
+          !missionMatch
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    resources,
+    selectedType,
+    selectedStatus,
+    selectedAgency,
+    selectedCapability,
+    searchQuery,
+  ]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 animate-fade-in pb-12">
+      {/* Top Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100 flex items-center gap-3">
-            <span>🛡️</span> Emergency Fleet & Resource Registry
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-black tracking-tight text-slate-100 flex items-center gap-2">
+              <span className="p-1.5 bg-blue-950 border border-blue-800 rounded-lg text-xl">🛡️</span>
+              Emergency Fleet & Resource Registry
+            </h1>
+          </div>
           <p className="text-sm text-slate-400 mt-1">
-            Real-time multi-agency fleet telemetry, capability matrix, and field unit readiness
+            Real-time multi-agency fleet telemetry, capability tracking, readiness levels, and field unit dispatch status
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          {/* Live Status Indicator */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs font-mono text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span>Telemetry Feed Live</span>
+          </div>
+
           <button
-            onClick={() => fetchResources()}
-            className="btn-secondary text-xs flex items-center gap-1.5"
+            onClick={() => fetchResources(true)}
+            disabled={isRefreshing || loading}
+            className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-2"
           >
-            <span>🔄</span> Refresh Telemetry
+            <RotateCcw size={14} className={isRefreshing ? "animate-spin text-blue-400" : ""} />
+            <span>{isRefreshing ? "Refreshing..." : "Refresh Telemetry"}</span>
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] text-slate-400 uppercase font-mono">Total Units</div>
-          <div className="text-2xl font-black text-slate-100">{resources.length}</div>
-        </div>
-        <div className="card p-4 space-y-1 border-l-4 border-l-emerald-500">
-          <div className="text-[11px] text-emerald-400 uppercase font-mono">Available & Ready</div>
-          <div className="text-2xl font-black text-emerald-400">{availableCount}</div>
-        </div>
-        <div className="card p-4 space-y-1 border-l-4 border-l-amber-500">
-          <div className="text-[11px] text-amber-400 uppercase font-mono">Active Deployment</div>
-          <div className="text-2xl font-black text-amber-400">{deployedCount}</div>
-        </div>
-        <div className="card p-4 space-y-1 border-l-4 border-l-red-500">
-          <div className="text-[11px] text-red-400 uppercase font-mono">Out of Service</div>
-          <div className="text-2xl font-black text-red-400">{maintenanceCount}</div>
-        </div>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="card p-4 space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
-          {/* Search bar */}
-          <div className="flex-1 relative">
-            <span className="absolute left-3 top-2.5 text-slate-400 text-sm">🔍</span>
-            <input
-              type="text"
-              placeholder="Search resource by name, agency, or type..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-base pl-9 text-xs w-full"
-            />
-          </div>
-
-          {/* Type Filter */}
+      {/* Feedback / Notification Banner */}
+      {feedbackMessage && (
+        <div
+          className={`p-3 rounded-lg border text-xs flex items-center justify-between gap-2 animate-slide-in ${
+            feedbackMessage.type === "success"
+              ? "bg-emerald-950/80 border-emerald-800 text-emerald-200"
+              : "bg-red-950/80 border-red-800 text-red-200"
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">Type:</span>
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="input-base py-1.5 px-2 text-xs bg-slate-900"
-            >
-              {RESOURCE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t.replace("_", " ")}
-                </option>
-              ))}
-            </select>
+            {feedbackMessage.type === "success" ? (
+              <CheckCircle size={16} className="text-emerald-400" />
+            ) : (
+              <AlertTriangle size={16} className="text-red-400" />
+            )}
+            <span>{feedbackMessage.text}</span>
           </div>
-
-          {/* Status Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">Status:</span>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="input-base py-1.5 px-2 text-xs bg-slate-900"
-            >
-              {RESOURCE_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s.replace("_", " ")}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Resource Cards Grid */}
-      {loading ? (
-        <div className="card p-12 text-center text-slate-400 space-y-3 flex flex-col items-center justify-center">
-          <div className="animate-spin text-3xl">⚙️</div>
-          <p className="text-sm">Fetching live fleet status...</p>
-        </div>
-      ) : filteredResources.length === 0 ? (
-        <div className="card p-12 text-center text-slate-500 space-y-3">
-          <div className="text-4xl">🛡️</div>
-          <h3 className="text-base font-semibold text-slate-300">No resources found</h3>
-          <p className="text-xs max-w-sm mx-auto">
-            Try adjusting your type or status filters.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredResources.map((res) => {
-            const isAvailable = res.status === "AVAILABLE";
-            const isDeployed = ["DISPATCHED", "EN_ROUTE", "ON_SCENE"].includes(res.status);
-            const activeAssignment = res.assignments?.[0];
-
-            return (
-              <div
-                key={res.id}
-                className="card p-5 space-y-4 hover:border-slate-700 transition-all duration-200 flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  {/* Top info */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-100">{res.name}</h3>
-                      <p className="text-xs text-slate-400">{res.agency.name}</p>
-                    </div>
-                    <span
-                      className={`text-[11px] font-semibold px-2 py-0.5 rounded font-mono ${
-                        isAvailable
-                          ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
-                          : isDeployed
-                          ? "bg-amber-950 text-amber-300 border border-amber-800 animate-pulse"
-                          : "bg-red-950 text-red-300 border border-red-800"
-                      }`}
-                    >
-                      {res.status.replace("_", " ")}
-                    </span>
-                  </div>
-
-                  {/* Capabilities */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] text-slate-500 uppercase font-mono">Specialized Capabilities</span>
-                    <div className="flex flex-wrap gap-1">
-                      {res.capabilities && res.capabilities.length > 0 ? (
-                        res.capabilities.map((c) => (
-                          <span
-                            key={c.id}
-                            className="text-[10px] bg-slate-900 border border-slate-800 text-blue-300 px-2 py-0.5 rounded font-mono"
-                          >
-                            {c.capability}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-[10px] text-slate-600">Standard Response</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Active Deployment Details if any */}
-                  {activeAssignment && (
-                    <div className="p-2.5 bg-amber-950/20 border border-amber-900/40 rounded text-xs space-y-1">
-                      <div className="text-[10px] text-amber-400 font-mono font-bold uppercase">
-                        Current Mission
-                      </div>
-                      <Link
-                        href={`/incidents/${activeAssignment.incident.id}`}
-                        className="font-medium text-slate-200 hover:text-amber-300 block truncate"
-                      >
-                        {activeAssignment.incident.title}
-                      </Link>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        Deployed {formatRelativeTime(activeAssignment.assignedAt)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Status Toggle Buttons */}
-                <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-slate-500 font-mono">Quick Status:</span>
-                  <div className="flex items-center gap-1.5">
-                    {res.status !== "AVAILABLE" && (
-                      <button
-                        onClick={() => handleStatusChange(res.id, "AVAILABLE")}
-                        disabled={updatingId === res.id}
-                        className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-1 rounded hover:bg-emerald-900 transition-colors"
-                      >
-                        Set Available
-                      </button>
-                    )}
-                    {res.status !== "ON_SCENE" && (
-                      <button
-                        onClick={() => handleStatusChange(res.id, "ON_SCENE")}
-                        disabled={updatingId === res.id}
-                        className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-1 rounded hover:bg-amber-900 transition-colors"
-                      >
-                        Set On Scene
-                      </button>
-                    )}
-                    {res.status !== "OUT_OF_SERVICE" && (
-                      <button
-                        onClick={() => handleStatusChange(res.id, "OUT_OF_SERVICE")}
-                        disabled={updatingId === res.id}
-                        className="text-[10px] bg-red-950 text-red-300 border border-red-800 px-2 py-1 rounded hover:bg-red-900 transition-colors"
-                      >
-                        Maintenance
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <button
+            onClick={() => setFeedbackMessage(null)}
+            className="text-slate-400 hover:text-slate-200 font-mono text-[10px]"
+          >
+            DISMISS
+          </button>
         </div>
       )}
+
+      {/* Fetch Error Banner */}
+      {fetchError && (
+        <div className="p-3 bg-red-950/80 border border-red-800 rounded-lg text-xs text-red-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-red-400" />
+            <span>Telemetry connection issue: {fetchError}</span>
+          </div>
+          <button
+            onClick={() => fetchResources(true)}
+            className="text-xs bg-red-900 hover:bg-red-800 text-white px-2.5 py-1 rounded"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Fleet KPI Overview Cards */}
+      <ResourceStatsOverview
+        resources={resources}
+        selectedStatus={selectedStatus}
+        onSelectStatusFilter={(st) => setSelectedStatus(st)}
+      />
+
+      {/* Filter & Search Bar */}
+      <ResourceFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        selectedAgency={selectedAgency}
+        onAgencyChange={setSelectedAgency}
+        agenciesList={agenciesList}
+        selectedType={selectedType}
+        onTypeChange={setSelectedType}
+        typesList={RESOURCE_TYPES}
+        selectedStatus={selectedStatus}
+        onStatusChange={setSelectedStatus}
+        statusesList={RESOURCE_STATUSES}
+        selectedCapability={selectedCapability}
+        onCapabilityChange={setSelectedCapability}
+        capabilitiesList={capabilitiesList}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        totalCount={resources.length}
+        filteredCount={filteredResources.length}
+        onResetFilters={handleResetFilters}
+      />
+
+      {/* Main Content Area */}
+      {loading ? (
+        <div className="card p-12 text-center text-slate-400 space-y-3 flex flex-col items-center justify-center">
+          <LoadingState label="Syncing live fleet telemetry & capability matrix..." />
+        </div>
+      ) : filteredResources.length === 0 ? (
+        <div className="card p-12 text-center border-slate-800 bg-slate-900/40">
+          <EmptyState
+            icon={Shield}
+            title="No Matching Resources Found"
+            description="No emergency fleet units match your current search parameters or active filters."
+            action={{
+              label: "Reset All Filters",
+              onClick: handleResetFilters,
+            }}
+          />
+        </div>
+      ) : viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredResources.map((resource) => (
+            <ResourceCard
+              key={resource.id}
+              resource={resource}
+              onQuickStatusChange={handleQuickStatusChange}
+              onOpenStatusModal={handleOpenStatusModal}
+              isUpdating={updatingId === resource.id}
+            />
+          ))}
+        </div>
+      ) : (
+        <ResourceTableView
+          resources={filteredResources}
+          onOpenStatusModal={handleOpenStatusModal}
+          onQuickStatusChange={handleQuickStatusChange}
+          updatingId={updatingId}
+        />
+      )}
+
+      {/* Status Management Modal */}
+      <ResourceStatusModal
+        resource={modalResource}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setModalResource(null);
+        }}
+        onStatusUpdated={handleModalStatusUpdated}
+      />
     </div>
   );
 }

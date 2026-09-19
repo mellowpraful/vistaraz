@@ -48,9 +48,9 @@ export async function POST(req: NextRequest) {
 
       const nextStep = Number(step) || 1;
       const stepOffsetSeconds = nextStep * 3600;
-      const events = currentScenario.events.filter((e) => e.timeOffset <= stepOffsetSeconds);
+      const events = currentScenario.events.filter((e: any) => e.timeOffset <= stepOffsetSeconds);
 
-      const casualtyCount = events.reduce((acc: number, e) => {
+      const casualtyCount = events.reduce((acc: number, e: any) => {
         try {
           const p = JSON.parse(e.data || "{}");
           return acc + (Number(p.casualties) || 0);
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         }
       }, 0);
 
-      const affectedCount = events.reduce((acc: number, e) => {
+      const affectedCount = events.reduce((acc: number, e: any) => {
         try {
           const p = JSON.parse(e.data || "{}");
           return acc + (Number(p.affected) || 0);
@@ -81,8 +81,8 @@ export async function POST(req: NextRequest) {
             affectedCount: affectedCount || 150 + nextStep * 120,
             casualtyCount: casualtyCount || 12 + nextStep * 8,
             hospitalStrain: hospitalStrain || Math.min(100, 35 + nextStep * 15),
-            roadsBlocked: events.filter((e) => e.type.includes("ROAD") || e.type.includes("INFRA")).length + 2,
-            powerOutageZones: events.filter((e) => e.type.includes("POWER") || e.type.includes("GRID")).length + 1,
+            roadsBlocked: events.filter((e: any) => e.type?.includes("ROAD") || e.type?.includes("INFRA")).length + 2,
+            powerOutageZones: events.filter((e: any) => e.type?.includes("POWER") || e.type?.includes("GRID")).length + 1,
           },
         },
       });

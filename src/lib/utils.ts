@@ -94,4 +94,67 @@ export function extractApiItem<T>(json: any): T | null {
   return null;
 }
 
+/**
+ * Safely parse equipment data which may be JSON arrays, strings, or comma-separated lists.
+ */
+export function parseEquipment(equipment: string | null | undefined): string[] {
+  if (!equipment) return [];
+  const trimmed = equipment.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+    } catch {
+      // Fall through to plain text parsing
+    }
+  }
+
+  if (trimmed.includes(",")) {
+    return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+
+  return [trimmed];
+}
+
+/**
+ * Evaluate telemetry freshness from last updated timestamp.
+ */
+export function getTelemetryFreshness(lastUpdated: Date | string | null | undefined): {
+  status: "live" | "recent" | "stale" | "unknown";
+  label: string;
+  ageMinutes: number;
+  isStale: boolean;
+} {
+  if (!lastUpdated) {
+    return { status: "unknown", label: "No Telemetry Signal", ageMinutes: 999999, isStale: true };
+  }
+  const date = typeof lastUpdated === "string" ? new Date(lastUpdated) : lastUpdated;
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const ageMinutes = Math.max(0, Math.floor(diffMs / 60000));
+
+  if (isNaN(ageMinutes)) {
+    return { status: "unknown", label: "Invalid Timestamp", ageMinutes: 999999, isStale: true };
+  }
+
+  if (ageMinutes <= 15) {
+    return { status: "live", label: "Live Telemetry", ageMinutes, isStale: false };
+  }
+  if (ageMinutes <= 120) {
+    return { status: "recent", label: `Updated ${ageMinutes}m ago`, ageMinutes, isStale: false };
+  }
+  const ageHours = Math.floor(ageMinutes / 60);
+  return {
+    status: "stale",
+    label: `Stale Telemetry (${ageHours >= 24 ? Math.floor(ageHours / 24) + "d ago" : ageHours + "h ago"})`,
+    ageMinutes,
+    isStale: true,
+  };
+}
+
+
 

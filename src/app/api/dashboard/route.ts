@@ -28,30 +28,34 @@ export async function GET(_req: NextRequest) {
     ]);
 
     // Calculate metrics
-    const incidentCounts = incidents.reduce<Record<string, number>>((acc, g) => {
-      acc[g.status] = g._count;
-      return acc;
-    }, {});
+    const incidentCounts: Record<string, number> = {};
+    (incidents as any[]).forEach((g) => {
+      if (g && g.status) {
+        incidentCounts[g.status] = typeof g._count === "number" ? g._count : (g._count?._all ?? 1);
+      }
+    });
 
-    const resourceCounts = resources.reduce<Record<string, number>>((acc, g) => {
-      acc[g.status] = g._count;
-      return acc;
-    }, {});
+    const resourceCounts: Record<string, number> = {};
+    (resources as any[]).forEach((g) => {
+      if (g && g.status) {
+        resourceCounts[g.status] = typeof g._count === "number" ? g._count : (g._count?._all ?? 1);
+      }
+    });
 
-    const totalBeds = hospitals.reduce((s, h) => s + h.totalBeds, 0);
-    const availableBeds = hospitals.reduce((s, h) => s + h.availableBeds, 0);
-    const totalShelterCapacity = shelters.reduce((s, sh) => s + sh.capacity, 0);
-    const shelterOccupied = shelters.reduce((s, sh) => s + sh.occupied, 0);
+    const totalBeds = hospitals.reduce((s: number, h: any) => s + (h.totalBeds ?? 0), 0);
+    const availableBeds = hospitals.reduce((s: number, h: any) => s + (h.availableBeds ?? 0), 0);
+    const totalShelterCapacity = shelters.reduce((s: number, sh: any) => s + (sh.capacity ?? 0), 0);
+    const shelterOccupied = shelters.reduce((s: number, sh: any) => s + (sh.occupied ?? 0), 0);
 
     return NextResponse.json({
       incidents: {
-        total: Object.values(incidentCounts).reduce((s, n) => s + n, 0),
+        total: Object.values(incidentCounts).reduce((s: number, n: number) => s + n, 0),
         byStatus: incidentCounts,
         active: (incidentCounts.REPORTED ?? 0) + (incidentCounts.VERIFIED ?? 0) +
                 (incidentCounts.ASSIGNED ?? 0) + (incidentCounts.IN_PROGRESS ?? 0),
       },
       resources: {
-        total: Object.values(resourceCounts).reduce((s, n) => s + n, 0),
+        total: Object.values(resourceCounts).reduce((s: number, n: number) => s + n, 0),
         byStatus: resourceCounts,
         available: resourceCounts.AVAILABLE ?? 0,
       },
