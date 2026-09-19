@@ -79,3 +79,62 @@
 
 ### 4. Limitations & Scope Boundaries
 - VoiceDispatch 911 Console, AI Commander, and Simulation modules were intentionally preserved without unrelated modifications.
+
+---
+
+## Agent 4 — AI Commander, Digital Twin & QA Integration
+
+### Date: 2026-09-19
+### Commit: `bfd1d79`
+
+### 1. AI Commander Service (`src/lib/ai/commander-service.ts`) — NEW FILE
+- **`generateExecutiveSitrep()`**: Live multi-agency situation intelligence report:
+  - Queries live DB (incidents, resources, hospitals, shelters, pending recommendations).
+  - **Confirmed Facts** — verified/assigned incidents with confidence ≥ 80%, sourced from field telemetry.
+  - **Unverified Reports** — citizen-sourced or low-confidence incident reports, with explicit uncertainty reasons and required field verification actions.
+  - **Priority Risks** — 3 pre-modelled cascade risks (Sabarmati flood surge, Vatva toxic vapor, ICU saturation) with probabilityScore and timeToImpact.
+  - **Cascading Effects** — multi-sector failure pathway narratives.
+  - **Resource Bottlenecks** — live counts of available vs. committed vs. required for boats, hazmat, and ALS ambulances; includes deficit calculations and mitigation strategies.
+  - **Explainable AI Recommendations** — generated from real pending `DispatchRecommendation` DB records + strategic recommendations; all carry `approvalStatus: "PENDING"` requiring human commander authorization.
+- **`executeCopilotQuery()`**: Tactical copilot Q&A backed by live database telemetry:
+  - Hospital/ICU bed availability synthesis with divert recommendations.
+  - Flood/boat/river operations branch with pre-positioning advice.
+  - Hazmat/chemical/Vatva branch with level-A protective directive.
+  - General SITREP/status overview branch.
+  - Returns structured `{ reply, confidence, uncertaintyNotes, recommendations[], telemetryReferences[] }`.
+
+### 2. AI Commander Page (`/ai-commander`) — ENHANCED
+- Renders live `ExecutiveSitrep` with SITREP ID, overall status badge (RED_ALERT/ELEVATED_WATCH/STABLE_OPS), and key metrics.
+- Confirmed Facts panel with source telemetry attribution and confidence percentages.
+- Unverified Reports panel with explicit uncertainty reasons and required actions.
+- Priority Risks display with probability scores and time-to-impact.
+- Cascading Effects narrative list.
+- Resource Bottlenecks panel with deficit counts and mitigation strategies.
+- Explainable Recommendations panel with PENDING approval gate UX.
+- Tactical Copilot chat interface with structured response rendering and action links.
+
+### 3. Digital Twin Simulation Page (`/simulation`) — ENHANCED
+- **Isolation Proof Banner**: Prominently displays `isolationProof.isIsolated=true`, `productionDatabaseMutated=false`, and `liveIncidentRecordsAffected=0` on every simulation step.
+- Cascade Risk Indicators panel: shows subsystem status, risk score gauge, and time-to-breach for Urban Drainage, Regional Grid, and Hospital Trauma Surge.
+- Simulated Resource Fleet breakdown: per-type available/deployed/exhausted counts during scenario steps.
+- Live-vs-Simulated comparison: wired to `action=COMPARE` endpoint showing real operational baseline vs. simulation projections.
+
+### 4. API Fixes (`src/app/api/simulation/route.ts`)
+- Resolved merge conflict between upstream event-filter-based roadsBlocked/powerOutageZones and Agent 4's deterministic step-linear formulas.
+- Retained upstream `hospitalStrain` fallback expression.
+- Added `isolationProof` block to every `STEP` action response confirming no production data mutation.
+
+### 5. Test Suite (`tests/run-tests.ts`) — EXTENDED TO 66 TESTS
+- **Test §7 — AI Commander SITREP**: 16 assertions covering SITREP structure, all required fields, copilot query accuracy.
+- **Test §8 — Digital Twin Isolation**: Confirms simulation CREATE does not increment live incident count.
+- **Tests §9-11** — Dispatch approval normalization, deduplication, fleet filtering, explainable scoring, eligibility auditing, and schema validation.
+- Fixed duplicate `ApproveDispatchSchema` dynamic import that caused esbuild compile error.
+
+### 6. Verification & Validation Results
+- **Automated Tests**: **66 passed, 0 failed** ✅
+- **All merge conflicts resolved cleanly** — no conflict markers remain in any file.
+- Production database isolation confirmed: simulation sandbox does not mutate live incident records.
+
+### 7. Scope Boundaries
+- VoiceDispatch, Incidents, Resources, and Dispatch Studio modules untouched — fully preserved from Agents 1–3.
+- All AI Commander outputs carry `approvalStatus: "PENDING"` and explicit `requiredHumanDecision` field — no autonomous consequential actions.
