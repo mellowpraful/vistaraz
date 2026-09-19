@@ -4,19 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { INCIDENT_TYPE_ICONS } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import {
-  Mic,
-  Phone,
-  Bot,
-  MapPin,
-  AlertTriangle,
-  Zap,
-  Users,
-  Radio,
-  Volume2,
-  ChevronRight,
-  CheckCircle,
+  Mic, Phone, Bot, MapPin, Zap, Radio,
+  Volume2, CheckCircle, Sparkles,
 } from "lucide-react";
 
 interface Scenario {
@@ -129,7 +119,7 @@ export default function VoiceDispatchPage() {
   const [typedTranscript, setTypedTranscript] = useState("");
   const [aiConfidence, setAiConfidence] = useState(0);
   const [creating, setCreating] = useState(false);
-  const [waveHeights, setWaveHeights] = useState<number[]>(Array(36).fill(8));
+  const [waveHeights, setWaveHeights] = useState<number[]>(Array(48).fill(12));
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const waveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,38 +138,32 @@ export default function VoiceDispatchPage() {
     const stepDuration = (scen.audioDuration * 1000) / totalSteps;
     let currentStep = 0;
 
+    waveTimerRef.current = setInterval(() => {
+      setWaveHeights(Array(48).fill(0).map(() => Math.floor(Math.random() * 80) + 10));
+    }, 80);
+
     timerRef.current = setInterval(() => {
       currentStep++;
-      const progress = Math.min(100, Math.round((currentStep / totalSteps) * 100));
+      const progress = Math.round((currentStep / totalSteps) * 100);
       setCallProgress(progress);
-      const charIndex = Math.round((progress / 100) * scen.transcript.length);
-      setTypedTranscript(scen.transcript.slice(0, charIndex));
-      setAiConfidence(Math.min(96, Math.round(progress * 0.96)));
+      const charCount = Math.floor((progress / 100) * scen.transcript.length);
+      setTypedTranscript(scen.transcript.slice(0, charCount));
+      setAiConfidence(Math.min(98, Math.round(progress * 0.98)));
 
       if (currentStep >= totalSteps) {
-        if (timerRef.current) clearInterval(timerRef.current);
+        clearInterval(timerRef.current!);
+        clearInterval(waveTimerRef.current!);
         setIsPlaying(false);
-        if (waveTimerRef.current) clearInterval(waveTimerRef.current);
-        setWaveHeights(Array(36).fill(4));
+        setCallProgress(100);
+        setTypedTranscript(scen.transcript);
+        setAiConfidence(98);
+        setWaveHeights(Array(48).fill(8));
       }
     }, stepDuration);
-
-    // Animate waveform
-    waveTimerRef.current = setInterval(() => {
-      setWaveHeights(
-        Array(36)
-          .fill(0)
-          .map((_, i) => Math.max(4, Math.abs(Math.sin((i + Date.now() / 200) * 0.7)) * 70 + Math.random() * 30))
-      );
-    }, 100);
   };
 
   useEffect(() => {
-    const initTimer = setTimeout(() => {
-      startCallSimulation(PRESET_SCENARIOS[0]);
-    }, 0);
     return () => {
-      clearTimeout(initTimer);
       if (timerRef.current) clearInterval(timerRef.current);
       if (waveTimerRef.current) clearInterval(waveTimerRef.current);
     };
@@ -194,10 +178,10 @@ export default function VoiceDispatchPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: ext.title,
-          description: ext.summary,
+          description: `[AI Voice Intake: ${activeScenario.langLabel}] ${ext.summary}`,
           type: ext.type,
           severity: ext.severity,
-          source: "EMERGENCY_CALL",
+          source: "VOICE_DISPATCH",
           locationName: ext.locationName,
           latitude: ext.latitude,
           longitude: ext.longitude,
@@ -205,18 +189,16 @@ export default function VoiceDispatchPage() {
           injuryCount: ext.injuryCount,
           hazards: ext.hazards,
           requiredCapabilities: ext.requiredCapabilities,
-          originalReport: activeScenario.transcript,
-          language: activeScenario.language,
-          aiExtracted: true,
-          confidence: aiConfidence / 100,
         }),
       });
       const json = await res.json();
-      if (json.success && json.data) {
+      if (json.success && json.data?.id) {
         router.push(`/dispatch?incidentId=${json.data.id}`);
+      } else {
+        router.push("/incidents");
       }
-    } catch (err) {
-      console.error("Failed to register incident:", err);
+    } catch {
+      router.push("/incidents");
     } finally {
       setCreating(false);
     }
@@ -226,32 +208,79 @@ export default function VoiceDispatchPage() {
   const isComplete = callProgress >= 100;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {/* ── Header ───────────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
-            <Mic size={20} color="#3b82f6" />
-            VoiceDispatch 911 Console
-          </h1>
-          <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
-            Multilingual emergency speech stream processing with real-time AI entity extraction and triage automation
-          </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: "20px" }}>
-            <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#ef4444", animation: "live-pulse 1s infinite" }} />
-            <span style={{ fontSize: "11px", fontWeight: "700", color: "#f87171", letterSpacing: "1px" }}>LIVE TELECOM INTAKE</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+
+      {/* ── PAGE HEADER ── */}
+      <div style={{
+        background: "var(--bg-card)",
+        border: "1px solid var(--border-primary)",
+        borderLeft: "4px solid #3b82f6",
+        borderRadius: "14px",
+        padding: "28px 32px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: "20px", flexWrap: "wrap",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+          <div style={{
+            width: "56px", height: "56px", borderRadius: "14px",
+            background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "26px",
+          }}>📡</div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "6px" }}>
+              <h1 style={{ fontSize: "26px", fontWeight: "800", color: "var(--text-primary)", margin: 0, letterSpacing: "-0.3px" }}>
+                VoiceDispatch AI Studio
+              </h1>
+              <span style={{
+                background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.4)",
+                color: "#c084fc", fontSize: "11px", fontWeight: "800",
+                padding: "4px 12px", borderRadius: "20px", letterSpacing: "1px",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>MULTILINGUAL ASR</span>
+            </div>
+            <p style={{ fontSize: "14px", color: "var(--text-muted)", margin: 0, maxWidth: "600px", lineHeight: 1.6 }}>
+              Autonomous emergency audio ingest, real-time vernacular NLP extraction, and 1-click dispatch escalation.
+            </p>
           </div>
         </div>
+
+        <button
+          onClick={() => startCallSimulation(activeScenario)}
+          disabled={isPlaying}
+          style={{
+            display: "flex", alignItems: "center", gap: "10px",
+            padding: "12px 24px",
+            background: isPlaying
+              ? "rgba(59,130,246,0.2)"
+              : "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+            border: isPlaying ? "1px solid rgba(59,130,246,0.4)" : "none",
+            borderRadius: "10px", color: "#fff",
+            fontWeight: "700", fontSize: "15px", cursor: isPlaying ? "not-allowed" : "pointer",
+            boxShadow: isPlaying ? "none" : "0 6px 24px rgba(37,99,235,0.45)",
+            transition: "all 0.2s", flexShrink: 0,
+            opacity: isPlaying ? 0.8 : 1,
+          }}
+        >
+          <Mic size={18} style={{ animation: isPlaying ? "pulse 1s infinite" : "none" }} />
+          {isPlaying ? "Stream In Progress..." : "Simulate Live Call"}
+        </button>
       </div>
 
-      {/* ── Scenario Selector ─────────────────────────────────────── */}
-      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)", borderRadius: "8px", padding: "14px 16px" }}>
-        <div style={{ fontSize: "10px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "10px" }}>
-          Simulate Incoming Emergency Call
+      {/* ── SCENARIO SELECTOR ── */}
+      <div style={{
+        background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+        borderRadius: "14px", padding: "24px 28px",
+      }}>
+        <div style={{ marginBottom: "18px" }}>
+          <div style={{ fontSize: "12px", fontWeight: "800", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "4px" }}>
+            Incoming Call Scenarios
+          </div>
+          <p style={{ fontSize: "14px", color: "var(--text-secondary)", margin: 0 }}>
+            Select an emergency call to simulate real-time multilingual audio ingest and AI field extraction.
+          </p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
           {PRESET_SCENARIOS.map((scen) => {
             const isActive = activeScenario.id === scen.id;
             return (
@@ -259,22 +288,34 @@ export default function VoiceDispatchPage() {
                 key={scen.id}
                 onClick={() => startCallSimulation(scen)}
                 style={{
-                  padding: "12px",
-                  textAlign: "left",
-                  borderRadius: "8px",
-                  border: `1px solid ${isActive ? "#6b21a8" : "var(--border-primary)"}`,
-                  background: isActive ? "#1a0b2e" : "var(--bg-secondary)",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
+                  padding: "22px", textAlign: "left", borderRadius: "12px",
+                  border: `2px solid ${isActive ? "rgba(139,92,246,0.7)" : "var(--border-primary)"}`,
+                  background: isActive ? "rgba(139,92,246,0.08)" : "var(--bg-secondary)",
+                  cursor: "pointer", transition: "all 0.2s",
+                  boxShadow: isActive ? "0 0 20px rgba(139,92,246,0.2)" : "none",
                 }}
-                onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-secondary)"; }}
-                onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-primary)"; }}
               >
-                <div style={{ fontSize: "18px", marginBottom: "4px" }}>{scen.emoji}</div>
-                <div style={{ fontSize: "12px", fontWeight: "700", color: isActive ? "#e9d5ff" : "var(--text-primary)", marginBottom: "4px" }}>{scen.title}</div>
+                <div style={{ fontSize: "36px", marginBottom: "12px", lineHeight: 1 }}>{scen.emoji}</div>
+                <div style={{ fontSize: "16px", fontWeight: "700", color: isActive ? "#c084fc" : "var(--text-primary)", marginBottom: "8px" }}>
+                  {scen.title}
+                </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: "10px", color: isActive ? "#c084fc" : "var(--text-muted)", fontWeight: "600" }}>{scen.langLabel}</span>
-                  <span style={{ fontSize: "9px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{scen.audioDuration}s</span>
+                  <span style={{
+                    fontSize: "12px", fontWeight: "700",
+                    color: isActive ? "#a78bfa" : "var(--text-muted)",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    🌐 {scen.langLabel}
+                  </span>
+                  <span style={{
+                    fontSize: "12px", fontWeight: "700",
+                    color: "var(--text-muted)", background: "var(--bg-card)",
+                    padding: "3px 10px", borderRadius: "6px",
+                    border: "1px solid var(--border-primary)",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    ⏱ {scen.audioDuration}s
+                  </span>
                 </div>
               </button>
             );
@@ -282,275 +323,308 @@ export default function VoiceDispatchPage() {
         </div>
       </div>
 
-      {/* ── Main 2-Column Console ──────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      {/* ── MAIN CONSOLE: AUDIO + AI EXTRACTION ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
 
         {/* LEFT: Audio Stream Panel */}
-        <Card style={{ borderColor: "#1d4ed820" }}>
-          <CardHeader>
-            <CardTitle>
-              <Phone size={14} color="#60a5fa" />
-              Incoming Audio Stream
-            </CardTitle>
-            <div style={{
-              padding: "3px 10px", borderRadius: "4px",
-              background: isPlaying ? "#052e16" : "#111827",
-              border: `1px solid ${isPlaying ? "#14532d" : "var(--border-primary)"}`,
-              color: isPlaying ? "#4ade80" : "var(--text-muted)",
-              fontSize: "9px", fontWeight: "700", letterSpacing: "1px",
-              animation: isPlaying ? "pulse-critical 2s ease-in-out infinite" : undefined,
-            }}>
-              {isPlaying ? "STREAMING LIVE" : isComplete ? "CALL COMPLETED" : "STANDBY"}
-            </div>
-          </CardHeader>
-
-          <CardContent style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            {/* Caller info */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)" }}>
-              <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#1e3a5f", border: "1px solid #1d4ed8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Phone size={14} color="#60a5fa" />
+        <div style={{
+          background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+          borderRadius: "14px", padding: "28px", display: "flex", flexDirection: "column", gap: "22px",
+        }}>
+          {/* Panel header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-primary)", paddingBottom: "18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{
+                width: "38px", height: "38px", borderRadius: "10px",
+                background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Phone size={18} color="#60a5fa" />
               </div>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-primary)" }}>{activeScenario.caller}</div>
-                <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>Lang: {activeScenario.langLabel} · {activeScenario.language}</div>
+                <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)" }}>Incoming Audio Stream</div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>Real-time speech ingest pipeline</div>
               </div>
             </div>
-
-            {/* Waveform Visualizer */}
-            <div
-              style={{
-                height: "80px",
-                background: "#050810",
-                borderRadius: "8px",
-                border: "1px solid var(--border-primary)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "3px",
-                padding: "8px 12px",
-                overflow: "hidden",
-              }}
-            >
-              {waveHeights.map((h, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: "3px",
-                    height: `${h}%`,
-                    borderRadius: "2px",
-                    flexShrink: 0,
-                    transition: "height 0.1s ease-out",
-                    background: isPlaying
-                      ? `hsl(${220 + i * 3}, 80%, ${50 + h * 0.3}%)`
-                      : "var(--border-secondary)",
-                    boxShadow: isPlaying ? `0 0 4px hsl(${220 + i * 3}, 80%, 50%)` : "none",
-                  }}
-                />
-              ))}
+            <div style={{
+              padding: "6px 14px", borderRadius: "8px", fontSize: "12px",
+              fontWeight: "800", letterSpacing: "1px",
+              fontFamily: "'JetBrains Mono', monospace",
+              background: isPlaying ? "rgba(74,222,128,0.12)" : isComplete ? "rgba(59,130,246,0.12)" : "var(--bg-secondary)",
+              border: `1px solid ${isPlaying ? "rgba(74,222,128,0.4)" : isComplete ? "rgba(59,130,246,0.4)" : "var(--border-primary)"}`,
+              color: isPlaying ? "#4ade80" : isComplete ? "#60a5fa" : "var(--text-muted)",
+              animation: isPlaying ? "pulse 2s infinite" : "none",
+            }}>
+              {isPlaying ? "● STREAMING" : isComplete ? "✓ COMPLETED" : "◯ STANDBY"}
             </div>
+          </div>
 
-            {/* Progress bar */}
+          {/* Caller Info Card */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "14px",
+            padding: "16px 20px", background: "var(--bg-secondary)",
+            border: "1px solid var(--border-primary)", borderRadius: "10px",
+          }}>
+            <div style={{
+              width: "44px", height: "44px", borderRadius: "10px", flexShrink: 0,
+              background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.25)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Phone size={20} color="#60a5fa" />
+            </div>
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px", fontSize: "10px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                  <Volume2 size={10} /> Speech Processing
-                </div>
-                <span>{callProgress}%</span>
+              <div style={{ fontSize: "15px", fontWeight: "700", color: "var(--text-primary)", marginBottom: "4px" }}>
+                {activeScenario.caller}
               </div>
-              <div style={{ height: "4px", background: "var(--bg-elevated)", borderRadius: "2px", overflow: "hidden" }}>
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${callProgress}%`,
-                    background: "linear-gradient(90deg, #3b82f6, #c084fc)",
-                    borderRadius: "2px",
-                    transition: "width 0.15s ease-out",
-                  }}
-                />
+              <div style={{ fontSize: "13px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+                Language: <strong style={{ color: "#c084fc" }}>{activeScenario.langLabel}</strong> ({activeScenario.language})
               </div>
             </div>
+          </div>
 
-            {/* Live Transcript */}
-            <div>
-              <div style={{ fontSize: "10px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
-                <Radio size={10} /> Real-Time Speech-to-Text
+          {/* Waveform Visualizer */}
+          <div style={{
+            height: "110px", background: "rgba(0,0,0,0.35)",
+            borderRadius: "12px", border: "1px solid var(--border-primary)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: "3px", padding: "0 16px", overflow: "hidden",
+          }}>
+            {waveHeights.map((h, i) => (
+              <div
+                key={i}
+                style={{
+                  width: "4px", height: `${h}%`, borderRadius: "3px", flexShrink: 0,
+                  transition: "height 0.08s ease-out",
+                  background: isPlaying
+                    ? `hsl(${210 + i * 3}, 85%, ${45 + h * 0.25}%)`
+                    : "rgba(255,255,255,0.08)",
+                  boxShadow: isPlaying ? `0 0 8px hsl(${210 + i * 3}, 85%, 55%)` : "none",
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Progress */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "var(--text-secondary)", fontWeight: "600" }}>
+                <Volume2 size={14} /> Speech Ingest Processing
               </div>
+              <span style={{ fontSize: "15px", fontWeight: "800", color: "#60a5fa", fontFamily: "'JetBrains Mono', monospace" }}>
+                {callProgress}%
+              </span>
+            </div>
+            <div style={{ height: "8px", background: "rgba(0,0,0,0.4)", borderRadius: "6px", overflow: "hidden", border: "1px solid var(--border-primary)" }}>
               <div
                 style={{
-                  padding: "12px",
-                  background: "#050810",
-                  border: "1px solid var(--border-primary)",
-                  borderRadius: "8px",
-                  minHeight: "100px",
-                  fontSize: "13px",
-                  color: "var(--text-primary)",
-                  fontFamily: "'JetBrains Mono', monospace",
-                  lineHeight: "1.6",
+                  width: `${callProgress}%`, height: "100%", borderRadius: "6px",
+                  background: "linear-gradient(90deg, #2563eb, #7c3aed)",
+                  transition: "width 0.15s ease",
+                  boxShadow: callProgress > 0 ? "0 0 12px rgba(124,58,237,0.6)" : "none",
                 }}
-              >
-                {typedTranscript || (
-                  <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Listening for emergency audio input...</span>
-                )}
-                {isPlaying && (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: "2px",
-                      height: "14px",
-                      background: "#c084fc",
-                      marginLeft: "2px",
-                      verticalAlign: "middle",
-                      animation: "pulse-critical 0.7s ease-in-out infinite",
-                    }}
-                  />
-                )}
-              </div>
+              />
             </div>
+          </div>
 
-            {/* Audio metadata */}
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", borderTop: "1px solid var(--border-primary)", paddingTop: "10px" }}>
-              <span>Codec: OPUS 48kHz HD</span>
-              <span>Latency: 84ms</span>
-              <span>Duration: {activeScenario.audioDuration}s</span>
+          {/* Live Transcript */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", fontWeight: "800", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>
+              <Radio size={13} color="#a78bfa" /> Real-Time Transcription
             </div>
-          </CardContent>
-        </Card>
-
-        {/* RIGHT: AI Extraction Panel */}
-        <Card style={{ borderColor: "#6b21a820" }}>
-          <CardHeader>
-            <CardTitle>
-              <Bot size={14} color="#c084fc" />
-              AI Incident Extraction
-            </CardTitle>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "18px", fontWeight: "800", color: "#c084fc", letterSpacing: "-0.5px", lineHeight: "1" }}>
-                {aiConfidence}%
-              </div>
-              <div style={{ fontSize: "9px", color: "var(--text-muted)", fontWeight: "600" }}>AI CONFIDENCE</div>
-            </div>
-          </CardHeader>
-
-          <CardContent style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {/* Confidence bar */}
-            <div style={{ height: "3px", background: "var(--bg-elevated)", borderRadius: "2px", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${aiConfidence}%`, background: "linear-gradient(90deg, #7c3aed, #c084fc)", borderRadius: "2px", transition: "width 0.3s ease-out" }} />
-            </div>
-
-            {/* Extracted incident title */}
-            <div style={{ padding: "12px", background: "var(--bg-secondary)", border: "1px solid #6b21a820", borderRadius: "8px" }}>
-              <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "6px" }}>Extracted Incident</div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                <span style={{ fontSize: "20px", flexShrink: 0 }}>
-                  {INCIDENT_TYPE_ICONS[ext.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨"}
+            <div style={{
+              padding: "16px", background: "rgba(0,0,0,0.35)",
+              borderRadius: "10px", border: "1px solid var(--border-primary)",
+              minHeight: "130px", fontSize: "14px", color: "var(--text-primary)",
+              fontFamily: "'JetBrains Mono', monospace", lineHeight: "1.7",
+            }}>
+              {typedTranscript || (
+                <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
+                  Listening for emergency audio input stream...
                 </span>
-                <div style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-primary)", lineHeight: "1.4" }}>{ext.title}</div>
-              </div>
-            </div>
-
-            {/* Key metrics grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-              <div style={{ padding: "10px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)", textAlign: "center" }}>
-                <div style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Type</div>
-                <span style={{ fontSize: "11px", fontWeight: "700", color: "#60a5fa", background: "#1e3a5f", border: "1px solid #1d4ed8", padding: "2px 8px", borderRadius: "4px" }}>
-                  {ext.type.replace(/_/g, " ")}
-                </span>
-              </div>
-              <div style={{ padding: "10px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)", textAlign: "center" }}>
-                <div style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Severity</div>
-                <Badge variant={ext.severity as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW"} dot pulse={ext.severity === "CRITICAL"}>
-                  {ext.severity}
-                </Badge>
-              </div>
-              <div style={{ padding: "10px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)", textAlign: "center" }}>
-                <div style={{ fontSize: "9px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Casualties</div>
-                <div style={{ fontSize: "12px", fontWeight: "700", color: "#f87171" }}>{ext.affectedCount} / {ext.injuryCount}inj</div>
-              </div>
-            </div>
-
-            {/* Location */}
-            <div style={{ padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "6px", border: "1px solid var(--border-primary)" }}>
-              <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>Geocoded Location</div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-primary)", fontWeight: "600" }}>
-                <MapPin size={12} color="#60a5fa" /> {ext.locationName}
-              </div>
-              <div style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", marginTop: "3px" }}>
-                GPS: {ext.latitude}°N, {ext.longitude}°E
-              </div>
-            </div>
-
-            {/* Hazards */}
-            <div>
-              <div style={{ fontSize: "10px", fontWeight: "700", color: "#f87171", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>
-                ⚠️ Environmental Hazards
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-                {ext.hazards.map((h, i) => (
-                  <span key={i} style={{ fontSize: "10px", background: "#450a0a", color: "#f87171", border: "1px solid #7f1d1d", padding: "2px 8px", borderRadius: "4px" }}>{h}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* Required Capabilities */}
-            <div>
-              <div style={{ fontSize: "10px", fontWeight: "700", color: "#60a5fa", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>
-                🎯 Required Capabilities
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-                {ext.requiredCapabilities.map((c, i) => (
-                  <span key={i} style={{ fontSize: "10px", background: "#1e3a5f", color: "#93c5fd", border: "1px solid #1d4ed8", padding: "2px 8px", borderRadius: "4px" }}>{c}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* AI Summary */}
-            <div style={{ padding: "10px 12px", background: "#1a0b2e", borderRadius: "6px", border: "1px solid #581c87" }}>
-              <div style={{ fontSize: "10px", color: "#c084fc", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "5px", display: "flex", alignItems: "center", gap: "5px" }}>
-                <Bot size={10} /> AI Situation Summary
-              </div>
-              <div style={{ fontSize: "12px", color: "#e9d5ff", lineHeight: "1.5" }}>{ext.summary}</div>
-            </div>
-
-            {/* Dispatch CTA */}
-            <div style={{ borderTop: "1px solid var(--border-primary)", paddingTop: "12px" }}>
-              <button
-                onClick={handleDispatchIncident}
-                disabled={creating || callProgress < 50}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  background: creating ? "#1d4ed8" : "linear-gradient(135deg, #1d4ed8, #7c3aed)",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#fff",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                  cursor: creating || callProgress < 50 ? "not-allowed" : "pointer",
-                  opacity: callProgress < 50 ? 0.5 : 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  boxShadow: callProgress >= 50 ? "0 4px 20px rgba(37,99,235,0.4)" : "none",
-                  transition: "all 0.2s",
-                }}
-              >
-                {creating ? (
-                  <>Registering Incident & Opening Dispatch...</>
-                ) : isComplete ? (
-                  <><CheckCircle size={16} /> Authorize Incident & Match Responders</>
-                ) : (
-                  <><Zap size={16} /> {callProgress < 50 ? `Processing... ${callProgress}%` : "Authorize & Dispatch"}</>
-                )}
-              </button>
-              {callProgress >= 50 && !isComplete && (
-                <div style={{ textAlign: "center", fontSize: "10px", color: "var(--text-muted)", marginTop: "6px" }}>
-                  You can authorize dispatch early — AI extraction is {aiConfidence}% complete
-                </div>
+              )}
+              {isPlaying && (
+                <span style={{
+                  display: "inline-block", width: "2px", height: "18px",
+                  background: "#a78bfa", marginLeft: "6px", verticalAlign: "middle",
+                  animation: "pulse 1s infinite",
+                }} />
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Audio tech footer */}
+          <div style={{
+            display: "flex", justifyContent: "space-between", fontSize: "12px",
+            color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace",
+            paddingTop: "14px", borderTop: "1px solid var(--border-primary)",
+          }}>
+            <span>Codec: OPUS 48kHz HD</span>
+            <span>Latency: 72ms</span>
+            <span>Duration: {activeScenario.audioDuration}s</span>
+          </div>
+        </div>
+
+        {/* RIGHT: AI Extraction Panel */}
+        <div style={{
+          background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+          borderRadius: "14px", padding: "28px", display: "flex", flexDirection: "column", gap: "20px",
+        }}>
+          {/* Panel header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-primary)", paddingBottom: "18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{
+                width: "38px", height: "38px", borderRadius: "10px",
+                background: "rgba(168,85,247,0.12)", border: "1px solid rgba(168,85,247,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Bot size={18} color="#a78bfa" />
+              </div>
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)" }}>AI Incident Extraction</div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>NLP entity & field extraction engine</div>
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: "30px", fontWeight: "900", color: "#a78bfa", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
+                {aiConfidence}%
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "2px" }}>
+                AI Confidence
+              </div>
+            </div>
+          </div>
+
+          {/* Extracted incident title */}
+          <div style={{
+            padding: "18px", background: "rgba(168,85,247,0.07)",
+            border: "1px solid rgba(168,85,247,0.3)", borderRadius: "12px",
+          }}>
+            <div style={{ fontSize: "12px", fontWeight: "800", color: "#a78bfa", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "10px" }}>
+              Extracted CAD Incident
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+              <span style={{ fontSize: "32px", flexShrink: 0, lineHeight: 1 }}>
+                {INCIDENT_TYPE_ICONS[ext.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨"}
+              </span>
+              <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", lineHeight: 1.4 }}>
+                {ext.title}
+              </div>
+            </div>
+          </div>
+
+          {/* Key metrics grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+            {[
+              { label: "Type", value: ext.type.replace(/_/g, " "), color: "#60a5fa" },
+              { label: "Severity", isComponent: true },
+              { label: "Affected / Injured", value: `${ext.affectedCount} / ${ext.injuryCount}`, color: "#f87171" },
+            ].map((item, i) => (
+              <div key={i} style={{
+                padding: "14px", background: "var(--bg-secondary)",
+                border: "1px solid var(--border-primary)", borderRadius: "10px", textAlign: "center",
+              }}>
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px", fontWeight: "700" }}>
+                  {item.label}
+                </div>
+                {item.isComponent ? (
+                  <Badge variant={ext.severity as any} dot pulse={ext.severity === "CRITICAL"} />
+                ) : (
+                  <span style={{ fontSize: "13px", fontWeight: "800", color: item.color, fontFamily: "'JetBrains Mono', monospace" }}>
+                    {item.value}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Location */}
+          <div style={{
+            padding: "16px 18px", background: "var(--bg-secondary)",
+            border: "1px solid var(--border-primary)", borderRadius: "10px",
+            display: "flex", flexDirection: "column", gap: "6px",
+          }}>
+            <div style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "700" }}>
+              Geocoded Location
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "15px", fontWeight: "700", color: "var(--text-primary)" }}>
+              <MapPin size={16} color="#60a5fa" /> {ext.locationName}
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+              {ext.latitude.toFixed(4)}°N, {ext.longitude.toFixed(4)}°E
+            </div>
+          </div>
+
+          {/* Hazards & Capabilities */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div>
+              <div style={{ fontSize: "12px", fontWeight: "800", color: "#f87171", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>
+                ⚠️ Hazards
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
+                {ext.hazards.map((h, i) => (
+                  <span key={i} style={{
+                    fontSize: "12px", background: "rgba(239,68,68,0.1)",
+                    color: "#fca5a5", border: "1px solid rgba(239,68,68,0.3)",
+                    padding: "4px 10px", borderRadius: "6px",
+                  }}>{h}</span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "12px", fontWeight: "800", color: "#60a5fa", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>
+                🎯 Capabilities
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
+                {ext.requiredCapabilities.map((c, i) => (
+                  <span key={i} style={{
+                    fontSize: "12px", background: "rgba(59,130,246,0.1)",
+                    color: "#93c5fd", border: "1px solid rgba(59,130,246,0.3)",
+                    padding: "4px 10px", borderRadius: "6px",
+                  }}>{c}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* AI Summary */}
+          <div style={{
+            padding: "16px 18px", background: "rgba(168,85,247,0.08)",
+            border: "1px solid rgba(168,85,247,0.25)", borderRadius: "10px",
+            display: "flex", flexDirection: "column", gap: "8px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", fontWeight: "800", color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              <Sparkles size={13} /> AI Situation Summary
+            </div>
+            <div style={{ fontSize: "14px", color: "#e9d5ff", lineHeight: "1.65" }}>{ext.summary}</div>
+          </div>
+
+          {/* Dispatch CTA */}
+          <button
+            onClick={handleDispatchIncident}
+            disabled={creating || callProgress < 50}
+            style={{
+              width: "100%", padding: "16px",
+              background: creating || callProgress < 50
+                ? "rgba(37,99,235,0.2)"
+                : "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+              border: creating || callProgress < 50 ? "1px solid rgba(37,99,235,0.3)" : "none",
+              borderRadius: "12px", color: "#fff",
+              fontWeight: "800", fontSize: "16px", cursor: creating || callProgress < 50 ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+              boxShadow: creating || callProgress < 50 ? "none" : "0 8px 30px rgba(37,99,235,0.5)",
+              transition: "all 0.2s",
+              opacity: creating || callProgress < 50 ? 0.6 : 1,
+            }}
+          >
+            {creating ? (
+              <>Registering Incident & Opening Dispatch Studio...</>
+            ) : isComplete ? (
+              <><CheckCircle size={20} /> Authorize Incident & Match Responders →</>
+            ) : (
+              <><Zap size={20} /> {callProgress < 50 ? `Processing Audio... ${callProgress}%` : "Authorize & Launch Dispatch →"}</>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

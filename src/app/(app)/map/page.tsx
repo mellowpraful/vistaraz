@@ -86,72 +86,58 @@ function MapViewContent() {
   return (
     <div className="space-y-4 h-[calc(100vh-110px)] flex flex-col">
       {/* Top Header & Layer Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 p-3 rounded-xl border border-slate-800 shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🗺️</span>
+      <div style={{
+        display: "flex", flexWrap: "wrap", alignItems: "center",
+        justifyContent: "space-between", gap: "16px",
+        background: "var(--bg-card)", padding: "18px 24px",
+        borderRadius: "12px", border: "1px solid var(--border-primary)",
+        borderLeft: "4px solid #22c55e", flexShrink: 0,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{
+            width: "42px", height: "42px", borderRadius: "10px",
+            background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px",
+          }}>🗺️</div>
           <div>
-            <h1 className="text-base font-bold text-slate-100">Live Geospatial Situation Room</h1>
-            <p className="text-[11px] text-slate-400">Multi-Agency Incident & Fleet Command Map</p>
+            <h1 style={{ fontSize: "20px", fontWeight: "800", color: "var(--text-primary)", margin: 0 }}>
+              Live Geospatial Situation Room
+            </h1>
+            <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: "3px 0 0" }}>
+              Multi-Agency Incident &amp; Fleet Command Map
+            </p>
           </div>
         </div>
 
         {/* Layer Checkboxes */}
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={layers.incidents}
-              onChange={(e) => setLayers({ ...layers, incidents: e.target.checked })}
-              className="rounded accent-red-500"
-            />
-            <span>🚨 Incidents ({incidents.length})</span>
-          </label>
-
-          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={layers.resources}
-              onChange={(e) => setLayers({ ...layers, resources: e.target.checked })}
-              className="rounded accent-emerald-500"
-            />
-            <span>🛡️ Fleet Units ({resources.length})</span>
-          </label>
-
-          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={layers.hospitals}
-              onChange={(e) => setLayers({ ...layers, hospitals: e.target.checked })}
-              className="rounded accent-blue-500"
-            />
-            <span>🏥 Hospitals ({hospitals.length})</span>
-          </label>
-
-          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={layers.shelters}
-              onChange={(e) => setLayers({ ...layers, shelters: e.target.checked })}
-              className="rounded accent-amber-500"
-            />
-            <span>⛺ Shelters ({shelters.length})</span>
-          </label>
-
-          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={layers.hazardZones}
-              onChange={(e) => setLayers({ ...layers, hazardZones: e.target.checked })}
-              className="rounded accent-purple-500"
-            />
-            <span>⚠️ Danger Zones</span>
-          </label>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "14px" }}>
+          {[
+            { key: "incidents" as const, label: `🚨 Incidents (${incidents.length})`, accent: "#ef4444" },
+            { key: "resources" as const, label: `🛡️ Fleet Units (${resources.length})`, accent: "#22c55e" },
+            { key: "hospitals" as const, label: `🏥 Hospitals (${hospitals.length})`, accent: "#3b82f6" },
+            { key: "shelters" as const, label: `⛺ Shelters (${shelters.length})`, accent: "#f59e0b" },
+            { key: "hazardZones" as const, label: "⚠️ Danger Zones", accent: "#a855f7" },
+          ].map(({ key, label, accent }) => (
+            <label key={key} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", color: "var(--text-secondary)", fontSize: "13px", fontWeight: "600" }}>
+              <input
+                type="checkbox"
+                checked={layers[key]}
+                onChange={(e) => setLayers({ ...layers, [key]: e.target.checked })}
+                style={{ accentColor: accent, width: "14px", height: "14px" }}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
 
           <button
             onClick={fetchData}
             disabled={loading}
-            className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 ml-2 transition-colors disabled:opacity-50"
-            title="Refresh Map Telemetry"
+            style={{
+              padding: "8px 16px", fontSize: "13px", fontWeight: "600",
+              background: "var(--bg-secondary)", color: "var(--text-secondary)",
+              border: "1px solid var(--border-primary)", borderRadius: "8px",
+              cursor: "pointer", marginLeft: "4px", opacity: loading ? 0.6 : 1,
+            }}
           >
             {loading ? "⟳ Refreshing..." : "⟳ Refresh"}
           </button>
@@ -178,136 +164,112 @@ function MapViewContent() {
 
         {/* Selected Entity Slide-over Inspector */}
         {selectedEntity && (
-          <div className="w-80 h-full card p-4 space-y-4 overflow-y-auto bg-slate-900/95 border-slate-800 shadow-2xl shrink-0 flex flex-col justify-between">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span className="text-[10px] font-bold uppercase font-mono text-purple-400">
-                  {selectedType} Inspector
-                </span>
-                <button
-                  onClick={() => setSelectedEntity(null)}
-                  className="text-slate-400 hover:text-white text-xs px-1"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {selectedType === "INCIDENT" && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">
-                      {INCIDENT_TYPE_ICONS[selectedEntity.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨"}
-                    </span>
-                    <h3 className="font-bold text-sm text-slate-100">{selectedEntity.title}</h3>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="badge-critical text-[10px] px-2 py-0.5 rounded font-mono">
-                      {selectedEntity.severity}
-                    </span>
-                    <span className="badge-neutral text-[10px] px-2 py-0.5 rounded font-mono">
-                      {selectedEntity.status}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    {selectedEntity.description}
-                  </p>
-
-                  <div className="p-2.5 bg-slate-950 rounded text-xs space-y-1 font-mono">
-                    <div className="text-slate-400">📍 {selectedEntity.locationName || "Scene"}</div>
-                    <div className="text-slate-500">
-                      Coordinates: {typeof selectedEntity.latitude === "number" ? selectedEntity.latitude.toFixed(4) : "—"},{" "}
-                      {typeof selectedEntity.longitude === "number" ? selectedEntity.longitude.toFixed(4) : "—"}
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex flex-col gap-2">
-                    <Link
-                      href={`/dispatch?incidentId=${selectedEntity.id}`}
-                      className="btn-primary text-xs py-2 text-center"
-                    >
-                      ⚡ Open Dispatch Studio
-                    </Link>
-                    <Link
-                      href={`/incidents/${selectedEntity.id}`}
-                      className="btn-secondary text-xs py-1.5 text-center"
-                    >
-                      Full SITREP & Timeline →
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              {selectedType === "RESOURCE" && (
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-100">{selectedEntity.name}</h3>
-                    <p className="text-xs text-slate-400">{selectedEntity.agency?.name || "Emergency Agency"}</p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="badge-neutral text-[10px] px-2 py-0.5 rounded font-mono">
-                      {selectedEntity.type}
-                    </span>
-                    <span className="text-xs font-semibold text-emerald-400">
-                      Status: {selectedEntity.status}
-                    </span>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-950 rounded text-xs space-y-1 font-mono">
-                    <div className="text-slate-500">
-                      GPS: {typeof selectedEntity.latitude === "number" ? selectedEntity.latitude.toFixed(4) : "—"},{" "}
-                      {typeof selectedEntity.longitude === "number" ? selectedEntity.longitude.toFixed(4) : "—"}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedType === "HOSPITAL" && (
-                <div className="space-y-3">
-                  <h3 className="font-bold text-sm text-slate-100">{selectedEntity.name}</h3>
-                  <div className="p-3 bg-slate-950 rounded space-y-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Available Beds:</span>
-                      <strong className="text-emerald-400">
-                        {selectedEntity.availableBeds ?? 0} / {selectedEntity.totalBeds ?? 0}
-                      </strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">ICU Capacity:</span>
-                      <strong className="text-blue-400">
-                        {selectedEntity.icuBedsAvailable ?? selectedEntity.availableIcu ?? 0} Beds
-                      </strong>
-                    </div>
-                  </div>
-                  <Link href="/hospitals" className="btn-secondary text-xs w-full text-center block py-1.5">
-                    View Network Capacity →
-                  </Link>
-                </div>
-              )}
-
-              {selectedType === "SHELTER" && (
-                <div className="space-y-3">
-                  <h3 className="font-bold text-sm text-slate-100">{selectedEntity.name}</h3>
-                  <div className="p-3 bg-slate-950 rounded space-y-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Current Occupancy:</span>
-                      <strong className="text-amber-400">
-                        {selectedEntity.currentOccupancy ?? selectedEntity.occupied ?? 0} / {selectedEntity.capacity ?? 0}
-                      </strong>
-                    </div>
-                  </div>
-                  <Link href="/hospitals" className="btn-secondary text-xs w-full text-center block py-1.5">
-                    Manage Shelter Stocks →
-                  </Link>
-                </div>
-              )}
+          <div style={{
+            width: "320px", height: "100%", flexShrink: 0,
+            background: "var(--bg-card)", border: "1px solid var(--border-secondary)",
+            borderRadius: "12px", padding: "20px", boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+            overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px",
+          }}>
+            {/* Inspector Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-primary)", paddingBottom: "14px" }}>
+              <span style={{ fontSize: "11px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1px", color: "#a78bfa", fontFamily: "'JetBrains Mono', monospace" }}>
+                {selectedType} Inspector
+              </span>
+              <button
+                onClick={() => setSelectedEntity(null)}
+                style={{ background: "transparent", border: "1px solid var(--border-primary)", borderRadius: "6px", color: "var(--text-muted)", cursor: "pointer", padding: "4px 8px", fontSize: "14px" }}
+              >
+                ✕
+              </button>
             </div>
+
+            {/* INCIDENT */}
+            {selectedType === "INCIDENT" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                  <span style={{ fontSize: "28px", lineHeight: 1, flexShrink: 0 }}>
+                    {INCIDENT_TYPE_ICONS[selectedEntity.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨"}
+                  </span>
+                  <h3 style={{ fontSize: "15px", fontWeight: "700", color: "var(--text-primary)", margin: 0, lineHeight: 1.4 }}>{selectedEntity.title}</h3>
+                </div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <span style={{ background: "#450a0a", color: "#f87171", border: "1px solid #7f1d1d", fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "6px", fontFamily: "monospace" }}>{selectedEntity.severity}</span>
+                  <span style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)", border: "1px solid var(--border-primary)", fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "6px", fontFamily: "monospace" }}>{selectedEntity.status}</span>
+                </div>
+                <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>{selectedEntity.description}</p>
+                <div style={{ padding: "12px", background: "rgba(0,0,0,0.3)", borderRadius: "8px", fontSize: "12px", fontFamily: "'JetBrains Mono', monospace", display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <div style={{ color: "var(--text-secondary)" }}>📍 {selectedEntity.locationName || "Scene"}</div>
+                  <div style={{ color: "var(--text-muted)" }}>
+                    {typeof selectedEntity.latitude === "number" ? selectedEntity.latitude.toFixed(4) : "—"}, {typeof selectedEntity.longitude === "number" ? selectedEntity.longitude.toFixed(4) : "—"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "4px" }}>
+                  <Link href={`/dispatch?incidentId=${selectedEntity.id}`} style={{ display: "block", padding: "10px", background: "var(--accent-blue)", color: "#fff", borderRadius: "8px", textAlign: "center", textDecoration: "none", fontSize: "13px", fontWeight: "700" }}>
+                    ⚡ Open Dispatch Studio
+                  </Link>
+                  <Link href={`/incidents/${selectedEntity.id}`} style={{ display: "block", padding: "9px", background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", color: "var(--text-secondary)", borderRadius: "8px", textAlign: "center", textDecoration: "none", fontSize: "13px", fontWeight: "600" }}>
+                    Full SITREP & Timeline →
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* RESOURCE */}
+            {selectedType === "RESOURCE" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div>
+                  <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", margin: "0 0 4px" }}>{selectedEntity.name}</h3>
+                  <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>{selectedEntity.agency?.name || "Emergency Agency"}</p>
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <span style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)", border: "1px solid var(--border-primary)", fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "6px", fontFamily: "monospace" }}>{selectedEntity.type}</span>
+                  <span style={{ fontSize: "13px", fontWeight: "600", color: "#4ade80" }}>● {selectedEntity.status}</span>
+                </div>
+                <div style={{ padding: "12px", background: "rgba(0,0,0,0.3)", borderRadius: "8px", fontSize: "12px", fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>
+                  GPS: {typeof selectedEntity.latitude === "number" ? selectedEntity.latitude.toFixed(4) : "—"}, {typeof selectedEntity.longitude === "number" ? selectedEntity.longitude.toFixed(4) : "—"}
+                </div>
+              </div>
+            )}
+
+            {/* HOSPITAL */}
+            {selectedType === "HOSPITAL" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", margin: 0 }}>{selectedEntity.name}</h3>
+                <div style={{ padding: "14px", background: "rgba(0,0,0,0.3)", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Available Beds</span>
+                    <strong style={{ color: "#4ade80" }}>{selectedEntity.availableBeds ?? 0} / {selectedEntity.totalBeds ?? 0}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>ICU Capacity</span>
+                    <strong style={{ color: "#60a5fa" }}>{selectedEntity.icuBedsAvailable ?? selectedEntity.availableIcu ?? 0} Beds</strong>
+                  </div>
+                </div>
+                <Link href="/hospitals" style={{ display: "block", padding: "9px", background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", color: "var(--text-secondary)", borderRadius: "8px", textAlign: "center", textDecoration: "none", fontSize: "13px", fontWeight: "600" }}>
+                  View Network Capacity →
+                </Link>
+              </div>
+            )}
+
+            {/* SHELTER */}
+            {selectedType === "SHELTER" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <h3 style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", margin: 0 }}>{selectedEntity.name}</h3>
+                <div style={{ padding: "14px", background: "rgba(0,0,0,0.3)", borderRadius: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Current Occupancy</span>
+                    <strong style={{ color: "#fbbf24" }}>{selectedEntity.currentOccupancy ?? selectedEntity.occupied ?? 0} / {selectedEntity.capacity ?? 0}</strong>
+                  </div>
+                </div>
+                <Link href="/hospitals" style={{ display: "block", padding: "9px", background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", color: "var(--text-secondary)", borderRadius: "8px", textAlign: "center", textDecoration: "none", fontSize: "13px", fontWeight: "600" }}>
+                  Manage Shelter Stocks →
+                </Link>
+              </div>
+            )}
 
             <button
               onClick={() => setSelectedEntity(null)}
-              className="btn-secondary text-xs w-full py-1.5"
+              style={{ padding: "10px", background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", borderRadius: "8px", color: "var(--text-muted)", cursor: "pointer", fontSize: "13px", fontWeight: "600", marginTop: "auto" }}
             >
               Close Inspector
             </button>

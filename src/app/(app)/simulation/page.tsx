@@ -2,22 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Activity,
-  Play,
-  Pause,
-  RotateCcw,
-  FastForward,
-  Rewind,
-  Plus,
-  ShieldCheck,
-  AlertTriangle,
-  Building2,
-  Users,
-  Compass,
-  Layers,
-  BarChart2,
-  CheckCircle,
-  HelpCircle,
+  Activity, Play, Pause, RotateCcw, FastForward, Rewind,
+  Plus, ShieldCheck, AlertTriangle, Layers, BarChart2,
+  CheckCircle, Compass, X,
 } from "lucide-react";
 import type { SimulatedResourceState } from "@/app/api/simulation/route";
 
@@ -39,25 +26,53 @@ interface SimulationScenario {
   events: SimulationEvent[];
 }
 
+type TabId = "SIMULATION" | "FLEET_STATE" | "CASCADE_RISKS" | "COMPARISON";
+
+const CASCADE_EVENTS = [
+  {
+    step: 1,
+    title: "Monsoon Surge Cloudburst Initiation",
+    desc: "Rainfall exceeds 110mm in 90 minutes. Sabarmati water gauge exceeds Danger Mark by 0.8m.",
+    tag: "METEOROLOGICAL",
+    color: "#60a5fa",
+  },
+  {
+    step: 2,
+    title: "Underpass Inundation & Traffic Arterial Severed",
+    desc: "Akhbarnagar underpass submerged in 2.2m of water. 4 public transport buses stranded.",
+    tag: "INFRASTRUCTURE",
+    color: "#f97316",
+  },
+  {
+    step: 3,
+    title: "Civil Hospital Substation Power Trip",
+    desc: "Emergency diesel generators activated. ICU life-support operating on secondary backup power.",
+    tag: "CRITICAL_FACILITY",
+    color: "#ef4444",
+  },
+  {
+    step: 4,
+    title: "Secondary Industrial Chemical Tank Seepage",
+    desc: "Floodwaters breach chemical retention basin at Narol GIDC. Low-grade organic solvent leak detected.",
+    tag: "HAZMAT_ESCALATION",
+    color: "#a855f7",
+  },
+];
+
 export default function SimulationPage() {
   const [scenarios, setScenarios] = useState<SimulationScenario[]>([]);
   const [selectedScenario, setSelectedScenario] = useState<SimulationScenario | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [playSpeed, setPlaySpeed] = useState<number>(1); // 1x, 2x, 5x
+  const [playSpeed, setPlaySpeed] = useState<number>(1);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"SIMULATION" | "FLEET_STATE" | "CASCADE_RISKS" | "COMPARISON">("SIMULATION");
+  const [activeTab, setActiveTab] = useState<TabId>("SIMULATION");
 
-  // Dynamic simulation telemetry
   const [metrics, setMetrics] = useState({
-    affectedCount: 150,
-    casualtyCount: 12,
-    hospitalStrain: 35,
-    roadsBlocked: 2,
-    powerOutageZones: 1,
+    affectedCount: 150, casualtyCount: 12,
+    hospitalStrain: 35, roadsBlocked: 2, powerOutageZones: 1,
   });
 
-  // Dynamic simulated resource states
   const [simulatedResources, setSimulatedResources] = useState<SimulatedResourceState[]>([
     { type: "Inflatable Rescue Boats", total: 6, available: 5, deployed: 1, exhaustedOrDamaged: 0 },
     { type: "ALS Ambulances", total: 10, available: 8, deployed: 2, exhaustedOrDamaged: 0 },
@@ -65,23 +80,15 @@ export default function SimulationPage() {
     { type: "Hazmat Containment Units", total: 3, available: 2, deployed: 1, exhaustedOrDamaged: 0 },
   ]);
 
-  // Dynamic cascade risks
-  const [cascadeRisks, setCascadeRisks] = useState<Array<{
-    subsystem: string;
-    status: string;
-    riskScore: number;
-    timeToBreach: string;
-  }>>([
+  const [cascadeRisks, setCascadeRisks] = useState([
     { subsystem: "Urban Drainage & Sluice Gates", status: "SURGING", riskScore: 55, timeToBreach: "45 mins" },
     { subsystem: "Regional Grid Substations", status: "ELEVATED_RISK", riskScore: 42, timeToBreach: "70 mins" },
     { subsystem: "Hospital Emergency Trauma Surge", status: "STRETCHED", riskScore: 52, timeToBreach: "45 mins" },
   ]);
 
-  // Comparison State
   const [comparisonData, setComparisonData] = useState<any>(null);
   const [loadingComparison, setLoadingComparison] = useState(false);
 
-  // New Scenario Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newScenName, setNewScenName] = useState("");
   const [newScenType, setNewScenType] = useState("FLOOD");
@@ -92,60 +99,43 @@ export default function SimulationPage() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load scenarios from API
   const fetchScenarios = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/simulation");
       const json = await res.json();
-      if (json.success && json.data.length > 0) {
+      if (json.success && json.data) {
         setScenarios(json.data);
-        setSelectedScenario(json.data[0]);
+        if (json.data.length > 0) setSelectedScenario(json.data[0]);
       }
     } catch (err) {
-      console.error("Failed to load simulations:", err);
+      console.error("Failed to load scenarios:", err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchScenarios();
-  }, [fetchScenarios]);
+  useEffect(() => { fetchScenarios(); }, [fetchScenarios]);
 
-  // Advance simulation step
-  const advanceStep = useCallback(
-    async (targetStep: number) => {
-      if (!selectedScenario) return;
-      try {
-        const res = await fetch("/api/simulation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "STEP",
-            scenarioId: selectedScenario.id,
-            step: targetStep,
-          }),
-        });
-        const json = await res.json();
-        if (json.success && json.data) {
-          setCurrentStep(targetStep);
-          setMetrics(json.data.metrics);
-          if (json.data.simulatedResources) {
-            setSimulatedResources(json.data.simulatedResources);
-          }
-          if (json.data.cascadeRisks) {
-            setCascadeRisks(json.data.cascadeRisks);
-          }
-        }
-      } catch (err) {
-        console.error("Simulation step error:", err);
+  const advanceStep = useCallback(async (targetStep: number) => {
+    setCurrentStep(targetStep);
+    try {
+      const res = await fetch("/api/simulation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "STEP", step: targetStep, scenarioId: selectedScenario?.id }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setMetrics(json.data.metrics);
+        setSimulatedResources(json.data.simulatedResources);
+        setCascadeRisks(json.data.cascadeRisks);
       }
-    },
-    [selectedScenario]
-  );
+    } catch (err) {
+      console.error("Step advance error:", err);
+    }
+  }, [selectedScenario]);
 
-  // Fetch Comparison Data
   const fetchComparison = useCallback(async () => {
     setLoadingComparison(true);
     try {
@@ -155,9 +145,7 @@ export default function SimulationPage() {
         body: JSON.stringify({ action: "COMPARE" }),
       });
       const json = await res.json();
-      if (json.success && json.data) {
-        setComparisonData(json.data);
-      }
+      if (json.success && json.data) setComparisonData(json.data);
     } catch (err) {
       console.error("Failed to load comparison data:", err);
     } finally {
@@ -166,20 +154,14 @@ export default function SimulationPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "COMPARISON") {
-      fetchComparison();
-    }
+    if (activeTab === "COMPARISON") fetchComparison();
   }, [activeTab, fetchComparison]);
 
-  // Simulation playback loop
   useEffect(() => {
     if (isPlaying) {
       timerRef.current = setInterval(() => {
         setCurrentStep((prev) => {
-          if (prev >= 6) {
-            setIsPlaying(false);
-            return prev;
-          }
+          if (prev >= 6) { setIsPlaying(false); return prev; }
           const next = prev + 1;
           advanceStep(next);
           return next;
@@ -188,23 +170,13 @@ export default function SimulationPage() {
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isPlaying, playSpeed, advanceStep]);
 
-  // Reset to initial conditions
   const handleReset = () => {
     setIsPlaying(false);
     setCurrentStep(1);
-    setMetrics({
-      affectedCount: 150,
-      casualtyCount: 12,
-      hospitalStrain: 35,
-      roadsBlocked: 2,
-      powerOutageZones: 1,
-    });
+    setMetrics({ affectedCount: 150, casualtyCount: 12, hospitalStrain: 35, roadsBlocked: 2, powerOutageZones: 1 });
     setSimulatedResources([
       { type: "Inflatable Rescue Boats", total: 6, available: 5, deployed: 1, exhaustedOrDamaged: 0 },
       { type: "ALS Ambulances", total: 10, available: 8, deployed: 2, exhaustedOrDamaged: 0 },
@@ -213,7 +185,6 @@ export default function SimulationPage() {
     ]);
   };
 
-  // Create new scenario
   const handleCreateScenario = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newScenName.trim()) return;
@@ -223,15 +194,9 @@ export default function SimulationPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "CREATE",
-          name: newScenName,
-          scenarioType: newScenType,
+          action: "CREATE", name: newScenName, scenarioType: newScenType,
           description: newScenDesc || "User-configured disaster simulation sandbox",
-          initialConditions: {
-            weather: newWeather,
-            wind: newWind,
-            populationDensity: "High Urban Sector",
-          },
+          initialConditions: { weather: newWeather, wind: newWind, populationDensity: "High Urban Sector" },
         }),
       });
       const json = await res.json();
@@ -240,8 +205,7 @@ export default function SimulationPage() {
         setSelectedScenario(json.data);
         handleReset();
         setShowCreateModal(false);
-        setNewScenName("");
-        setNewScenDesc("");
+        setNewScenName(""); setNewScenDesc("");
       }
     } catch (err) {
       console.error("Failed to create scenario:", err);
@@ -250,7 +214,6 @@ export default function SimulationPage() {
     }
   };
 
-  // Parse scenario initial conditions config
   let initialConditions: Record<string, string> = {
     weather: "Monsoon squall line — 110mm/h",
     initialSurge: "+0.8m above danger mark",
@@ -263,461 +226,480 @@ export default function SimulationPage() {
     }
   } catch {}
 
+  const TABS: { id: TabId; icon: React.ReactNode; label: string }[] = [
+    { id: "SIMULATION", icon: <Activity size={16} />, label: "Cascade Event Timeline" },
+    { id: "FLEET_STATE", icon: <Layers size={16} />, label: "Fleet Degradation" },
+    { id: "CASCADE_RISKS", icon: <AlertTriangle size={16} />, label: "Vulnerability Matrix" },
+    { id: "COMPARISON", icon: <BarChart2 size={16} />, label: "Live vs Simulated" },
+  ];
+
+  const inputStyle = {
+    width: "100%", padding: "11px 14px",
+    background: "var(--bg-secondary)", border: "1px solid var(--border-primary)",
+    borderRadius: "8px", color: "var(--text-primary)", fontSize: "14px",
+    fontFamily: "inherit", boxSizing: "border-box" as const,
+  };
+
   return (
-    <div className="space-y-6">
-      {/* ── Strict Isolation Banner ────────────────────────────────────── */}
-      <div className="bg-amber-950/40 border border-amber-800/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-md backdrop-blur">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-950 border border-amber-700 flex items-center justify-center text-amber-400">
-            <ShieldCheck size={20} />
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+
+      {/* ── SANDBOX ISOLATION BANNER ── */}
+      <div style={{
+        background: "rgba(120,53,15,0.2)", border: "1px solid rgba(217,119,6,0.5)",
+        borderLeft: "4px solid #f59e0b", borderRadius: "14px",
+        padding: "20px 28px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: "20px", flexWrap: "wrap",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{
+            width: "46px", height: "46px", borderRadius: "12px", flexShrink: 0,
+            background: "rgba(120,53,15,0.4)", border: "1px solid rgba(217,119,6,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <ShieldCheck size={22} color="#fbbf24" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-amber-300 uppercase tracking-wider">
-                Digital Twin Sandbox Environment — Strict Isolation Active
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "5px" }}>
+              <span style={{ fontSize: "15px", fontWeight: "800", color: "#fbbf24", letterSpacing: "0.3px" }}>
+                Digital Twin Sandbox — Strict Isolation Active
               </span>
-              <span className="text-[10px] font-mono bg-amber-900/80 text-amber-200 px-2 py-0.5 rounded border border-amber-700">
+              <span style={{
+                fontSize: "11px", fontWeight: "800", padding: "3px 10px",
+                background: "rgba(120,53,15,0.6)", color: "#fde68a",
+                border: "1px solid rgba(217,119,6,0.4)", borderRadius: "6px",
+                fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.5px",
+              }}>
                 ZERO LIVE DB MUTATIONS
               </span>
             </div>
-            <p className="text-slate-300 text-[11px] mt-0.5">
-              All events, resource deployments, and casualties generated within this module operate strictly in simulated memory. Production records remain untouched.
+            <p style={{ fontSize: "13px", color: "rgba(253,230,138,0.7)", margin: 0, lineHeight: 1.5 }}>
+              All events, resource deployments, and casualties operate strictly in simulated memory. Production records remain untouched.
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-2 self-end sm:self-center font-mono text-[11px] text-amber-400 bg-amber-950/90 px-3 py-1.5 rounded-lg border border-amber-800">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-          SANDBOX TIMELINE: Hour +0{currentStep}:00
+        <div style={{
+          display: "flex", alignItems: "center", gap: "10px",
+          background: "rgba(120,53,15,0.5)", border: "1px solid rgba(217,119,6,0.4)",
+          padding: "10px 20px", borderRadius: "10px", flexShrink: 0,
+        }}>
+          <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#fbbf24", animation: "pulse 1.5s infinite", flexShrink: 0, display: "inline-block" }} />
+          <span style={{ fontSize: "14px", fontWeight: "800", color: "#fbbf24", fontFamily: "'JetBrains Mono', monospace" }}>
+            SANDBOX TIMELINE: Hour +0{currentStep}:00
+          </span>
         </div>
       </div>
 
-      {/* ── Scenario Selection & Control Bar ─────────────────────────────── */}
-      <div className="card p-5 space-y-4 border-slate-800 bg-slate-900/90 shadow-xl">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          {/* Scenario Selector & New Button */}
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+      {/* ── SCENARIO CONTROL PANEL ── */}
+      <div style={{
+        background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+        borderRadius: "14px", padding: "24px 28px",
+        display: "flex", flexDirection: "column", gap: "22px",
+      }}>
+        {/* Row 1: Scenario selector + controls */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
+          {/* Scenario dropdown */}
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", flex: 1, flexWrap: "wrap" }}>
+            <span style={{ fontSize: "13px", fontWeight: "800", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", whiteSpace: "nowrap" }}>
               Active Scenario:
             </span>
             <select
               value={selectedScenario?.id || ""}
               onChange={(e) => {
                 const scen = scenarios.find((s) => s.id === e.target.value);
-                if (scen) {
-                  setSelectedScenario(scen);
-                  handleReset();
-                }
+                if (scen) { setSelectedScenario(scen); handleReset(); }
               }}
-              className="input-base text-xs bg-slate-950 font-semibold max-w-md py-2 border-slate-800"
+              style={{ ...inputStyle, maxWidth: "360px", cursor: "pointer" }}
             >
               {scenarios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.type})
-                </option>
+                <option key={s.id} value={s.id}>{s.name} ({s.type})</option>
               ))}
             </select>
-
             <button
               onClick={() => setShowCreateModal(true)}
-              className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 hover:border-purple-600 hover:text-purple-300"
+              style={{
+                display: "flex", alignItems: "center", gap: "8px",
+                padding: "10px 18px", background: "rgba(168,85,247,0.1)",
+                border: "1px solid rgba(168,85,247,0.4)", borderRadius: "8px",
+                color: "#c084fc", cursor: "pointer", fontSize: "14px", fontWeight: "700",
+              }}
             >
-              <Plus size={13} />
-              <span>Create Custom Scenario</span>
+              <Plus size={15} /> Create Scenario
             </button>
           </div>
 
           {/* Player Controls */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Speed Selector */}
-            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
-              <span className="text-slate-500 px-1.5 font-mono text-[11px]">Speed:</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            {/* Speed */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              background: "var(--bg-secondary)", border: "1px solid var(--border-primary)",
+              borderRadius: "8px", padding: "6px 8px",
+            }}>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "monospace", paddingRight: "4px" }}>Speed:</span>
               {[1, 2, 5].map((spd) => (
                 <button
                   key={spd}
                   onClick={() => setPlaySpeed(spd)}
-                  className={`px-2 py-0.5 rounded text-xs font-mono transition-colors ${
-                    playSpeed === spd
-                      ? "bg-purple-600 text-white font-bold"
-                      : "text-slate-400 hover:text-white"
-                  }`}
+                  style={{
+                    padding: "5px 12px", borderRadius: "6px", border: "none",
+                    background: playSpeed === spd ? "#7c3aed" : "transparent",
+                    color: playSpeed === spd ? "#fff" : "var(--text-muted)",
+                    fontSize: "13px", fontWeight: "700", cursor: "pointer",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    transition: "all 0.15s",
+                  }}
                 >
                   {spd}x
                 </button>
               ))}
             </div>
 
-            {/* Play/Pause */}
             <button
-              onClick={() => setIsPlaying(!isPlaying)}
-              className={`btn-primary text-xs py-2 px-4 flex items-center gap-1.5 transition-all ${
-                isPlaying ? "bg-amber-600 hover:bg-amber-500" : "bg-purple-600 hover:bg-purple-500"
-              }`}
-            >
-              {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-              <span>{isPlaying ? "Pause Simulation" : "Run Simulation"}</span>
-            </button>
-
-            {/* Step Backward */}
-            <button
-              onClick={() => {
-                if (currentStep > 1) advanceStep(currentStep - 1);
-              }}
+              onClick={() => { if (currentStep > 1) advanceStep(currentStep - 1); }}
               disabled={isPlaying || currentStep <= 1}
-              className="btn-secondary text-xs py-2 px-2.5 disabled:opacity-40"
+              style={{
+                padding: "10px 14px", background: "var(--bg-secondary)",
+                border: "1px solid var(--border-primary)", borderRadius: "8px",
+                color: "var(--text-secondary)", cursor: "pointer", fontSize: "14px",
+                opacity: (isPlaying || currentStep <= 1) ? 0.4 : 1,
+              }}
               title="Step Backward"
             >
-              <Rewind size={13} />
+              <Rewind size={16} />
             </button>
 
-            {/* Step Forward */}
             <button
-              onClick={() => {
-                if (currentStep < 6) advanceStep(currentStep + 1);
+              onClick={() => setIsPlaying(!isPlaying)}
+              style={{
+                display: "flex", alignItems: "center", gap: "8px",
+                padding: "10px 22px", borderRadius: "8px",
+                background: isPlaying
+                  ? "linear-gradient(135deg, #d97706, #f59e0b)"
+                  : "linear-gradient(135deg, #7c3aed, #6d28d9)",
+                border: "none", color: "#fff", fontWeight: "700", fontSize: "14px",
+                cursor: "pointer", boxShadow: `0 4px 20px ${isPlaying ? "rgba(217,119,6,0.4)" : "rgba(124,58,237,0.4)"}`,
               }}
-              disabled={isPlaying || currentStep >= 6}
-              className="btn-secondary text-xs py-2 px-3 disabled:opacity-40 flex items-center gap-1"
             >
-              <span>+1 Hour</span>
-              <FastForward size={13} />
+              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+              {isPlaying ? "Pause" : "Run Simulation"}
             </button>
 
-            {/* Reset */}
+            <button
+              onClick={() => { if (currentStep < 6) advanceStep(currentStep + 1); }}
+              disabled={isPlaying || currentStep >= 6}
+              style={{
+                display: "flex", alignItems: "center", gap: "6px",
+                padding: "10px 16px", background: "var(--bg-secondary)",
+                border: "1px solid var(--border-primary)", borderRadius: "8px",
+                color: "var(--text-secondary)", cursor: "pointer", fontSize: "14px", fontWeight: "600",
+                opacity: (isPlaying || currentStep >= 6) ? 0.4 : 1,
+              }}
+            >
+              +1h <FastForward size={15} />
+            </button>
+
             <button
               onClick={handleReset}
-              className="btn-secondary text-xs py-2 px-3 hover:text-red-400 flex items-center gap-1"
+              style={{
+                display: "flex", alignItems: "center", gap: "6px",
+                padding: "10px 16px", background: "var(--bg-secondary)",
+                border: "1px solid var(--border-primary)", borderRadius: "8px",
+                color: "var(--text-muted)", cursor: "pointer", fontSize: "14px", fontWeight: "600",
+              }}
             >
-              <RotateCcw size={13} />
-              <span>Reset</span>
+              <RotateCcw size={15} /> Reset
             </button>
           </div>
         </div>
 
-        {/* Initial Conditions HUD */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800/80 text-[11px] font-mono">
-          <div className="p-2 bg-slate-950/60 rounded border border-slate-800/60">
-            <span className="text-slate-500 block text-[10px]">WEATHER DYNAMICS</span>
-            <span className="text-slate-200">{initialConditions.weather}</span>
-          </div>
-          <div className="p-2 bg-slate-950/60 rounded border border-slate-800/60">
-            <span className="text-slate-500 block text-[10px]">SURGE THRESHOLD</span>
-            <span className="text-amber-400">{initialConditions.initialSurge || "+0.8m"}</span>
-          </div>
-          <div className="p-2 bg-slate-950/60 rounded border border-slate-800/60">
-            <span className="text-slate-500 block text-[10px]">WIND CONE</span>
-            <span className="text-slate-200">{initialConditions.wind || "14 km/h"}</span>
-          </div>
-          <div className="p-2 bg-slate-950/60 rounded border border-slate-800/60">
-            <span className="text-slate-500 block text-[10px]">POPULATION DENSITY</span>
-            <span className="text-slate-200">{initialConditions.populationDensity}</span>
-          </div>
+        {/* Row 2: Initial Conditions */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", paddingTop: "10px", borderTop: "1px solid var(--border-primary)" }}>
+          {[
+            { label: "WEATHER DYNAMICS", value: initialConditions.weather, color: "var(--text-primary)" },
+            { label: "SURGE THRESHOLD", value: initialConditions.initialSurge || "+0.8m", color: "#fbbf24" },
+            { label: "WIND CONE", value: initialConditions.wind || "14 km/h", color: "var(--text-primary)" },
+            { label: "POPULATION DENSITY", value: initialConditions.populationDensity, color: "var(--text-primary)" },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{
+              padding: "14px 16px", background: "var(--bg-secondary)",
+              borderRadius: "10px", border: "1px solid var(--border-primary)",
+            }}>
+              <div style={{ fontSize: "11px", fontWeight: "800", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>
+                {label}
+              </div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color, fontFamily: "'JetBrains Mono', monospace" }}>
+                {value}
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Timeline Stepper */}
-        <div className="space-y-2 pt-1">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-slate-400">Simulation Progression Hours</span>
-            <span className="text-purple-400 font-bold">Hour +0{currentStep}:00 (Step {currentStep} of 6)</span>
+        {/* Row 3: Timeline stepper */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "var(--text-secondary)", fontWeight: "600" }}>
+            <span>Simulation Progression</span>
+            <span style={{ color: "#a78bfa", fontFamily: "'JetBrains Mono', monospace", fontWeight: "800" }}>
+              Hour +0{currentStep}:00 — Step {currentStep} of 6
+            </span>
           </div>
-          <div className="grid grid-cols-6 gap-2">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "8px" }}>
             {[1, 2, 3, 4, 5, 6].map((st) => (
-              <div
+              <button
                 key={st}
-                className={`h-2.5 rounded-full transition-all duration-300 ${
-                  st <= currentStep
-                    ? "bg-gradient-to-r from-blue-500 via-purple-500 to-amber-500 shadow-md shadow-purple-500/30"
-                    : "bg-slate-800"
-                }`}
+                onClick={() => !isPlaying && advanceStep(st)}
+                style={{
+                  height: "10px", borderRadius: "6px",
+                  background: st <= currentStep
+                    ? "linear-gradient(90deg, #3b82f6, #7c3aed, #f59e0b)"
+                    : "var(--bg-secondary)",
+                  border: st === currentStep ? "none" : "1px solid var(--border-primary)",
+                  cursor: isPlaying ? "default" : "pointer",
+                  transition: "all 0.3s",
+                  boxShadow: st <= currentStep ? "0 0 10px rgba(124,58,237,0.4)" : "none",
+                }}
               />
             ))}
           </div>
         </div>
       </div>
 
-      {/* ── Dynamic Telemetry Metrics Cards ────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="card p-3.5 bg-slate-900/80 border-slate-800 space-y-1">
-          <div className="text-[10px] text-slate-400 uppercase font-mono">Simulated Affected</div>
-          <div className="text-2xl font-black text-slate-100 font-mono">{metrics.affectedCount}</div>
-          <span className="text-[10px] text-slate-500 font-mono">+{(currentStep - 1) * 120} vs t0</span>
-        </div>
-
-        <div className="card p-3.5 bg-slate-900/80 border-l-4 border-l-red-500 space-y-1">
-          <div className="text-[10px] text-red-400 uppercase font-mono">Simulated Casualties</div>
-          <div className="text-2xl font-black text-red-400 font-mono">{metrics.casualtyCount}</div>
-          <span className="text-[10px] text-red-400/80 font-mono">Acute Trauma</span>
-        </div>
-
-        <div className="card p-3.5 bg-slate-900/80 border-l-4 border-l-amber-500 space-y-1">
-          <div className="text-[10px] text-amber-400 uppercase font-mono">Hospital Bed Strain</div>
-          <div className="text-2xl font-black text-amber-400 font-mono">{metrics.hospitalStrain}%</div>
-          <span className="text-[10px] text-amber-400/80 font-mono">Regional ICU</span>
-        </div>
-
-        <div className="card p-3.5 bg-slate-900/80 border-l-4 border-l-purple-500 space-y-1">
-          <div className="text-[10px] text-purple-400 uppercase font-mono">Roads Submerged</div>
-          <div className="text-2xl font-black text-purple-400 font-mono">{metrics.roadsBlocked} Arterials</div>
-          <span className="text-[10px] text-purple-400/80 font-mono">Transit Severed</span>
-        </div>
-
-        <div className="card p-3.5 bg-slate-900/80 border-l-4 border-l-blue-500 space-y-1">
-          <div className="text-[10px] text-blue-400 uppercase font-mono">Grid Blackouts</div>
-          <div className="text-2xl font-black text-blue-400 font-mono">{metrics.powerOutageZones} Zones</div>
-          <span className="text-[10px] text-blue-400/80 font-mono">Backup Power</span>
-        </div>
+      {/* ── LIVE METRICS CARDS ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "16px" }}>
+        {[
+          { label: "Simulated Affected", value: metrics.affectedCount, suffix: "", color: "var(--text-primary)", border: "var(--border-primary)", sub: `+${(currentStep - 1) * 120} vs t0` },
+          { label: "Simulated Casualties", value: metrics.casualtyCount, suffix: "", color: "#f87171", border: "#ef4444", sub: "Acute Trauma" },
+          { label: "Hospital Bed Strain", value: metrics.hospitalStrain, suffix: "%", color: "#fbbf24", border: "#f59e0b", sub: "Regional ICU" },
+          { label: "Roads Submerged", value: metrics.roadsBlocked, suffix: " Arterials", color: "#c084fc", border: "#a855f7", sub: "Transit Severed" },
+          { label: "Grid Blackouts", value: metrics.powerOutageZones, suffix: " Zones", color: "#60a5fa", border: "#3b82f6", sub: "Backup Power" },
+        ].map(({ label, value, suffix, color, border, sub }) => (
+          <div key={label} style={{
+            padding: "20px", background: "var(--bg-card)",
+            borderStyle: "solid", borderTopWidth: "1px", borderRightWidth: "1px",
+            borderBottomWidth: "1px", borderLeftWidth: "4px",
+            borderTopColor: "var(--border-primary)", borderRightColor: "var(--border-primary)",
+            borderBottomColor: "var(--border-primary)", borderLeftColor: border,
+            borderRadius: "12px",
+          }}>
+            <div style={{ fontSize: "11px", fontWeight: "800", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+              {label}
+            </div>
+            <div style={{ fontSize: "28px", fontWeight: "900", color, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, marginBottom: "6px" }}>
+              {value}{suffix}
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{sub}</div>
+          </div>
+        ))}
       </div>
 
-      {/* ── Sub-Tabs: Stream / Fleet / Cascade / Comparison ───────────── */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-        <button
-          onClick={() => setActiveTab("SIMULATION")}
-          className={`text-xs px-3.5 py-1.5 rounded-lg transition-colors font-semibold flex items-center gap-2 ${
-            activeTab === "SIMULATION" ? "bg-purple-600 text-white" : "bg-slate-900 text-slate-400 hover:text-white"
-          }`}
-        >
-          <Activity size={13} /> Cascade Event Timeline
-        </button>
-        <button
-          onClick={() => setActiveTab("FLEET_STATE")}
-          className={`text-xs px-3.5 py-1.5 rounded-lg transition-colors font-semibold flex items-center gap-2 ${
-            activeTab === "FLEET_STATE" ? "bg-purple-600 text-white" : "bg-slate-900 text-slate-400 hover:text-white"
-          }`}
-        >
-          <Layers size={13} /> Simulated Fleet Degradation
-        </button>
-        <button
-          onClick={() => setActiveTab("CASCADE_RISKS")}
-          className={`text-xs px-3.5 py-1.5 rounded-lg transition-colors font-semibold flex items-center gap-2 ${
-            activeTab === "CASCADE_RISKS" ? "bg-purple-600 text-white" : "bg-slate-900 text-slate-400 hover:text-white"
-          }`}
-        >
-          <AlertTriangle size={13} /> Subsystem Vulnerability Matrix
-        </button>
-        <button
-          onClick={() => setActiveTab("COMPARISON")}
-          className={`text-xs px-3.5 py-1.5 rounded-lg transition-colors font-semibold flex items-center gap-2 ${
-            activeTab === "COMPARISON" ? "bg-purple-600 text-white" : "bg-slate-900 text-slate-400 hover:text-white"
-          }`}
-        >
-          <BarChart2 size={13} /> Live vs. Simulated Comparison
-        </button>
+      {/* ── TABS ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "8px",
+        borderBottom: "2px solid var(--border-primary)", paddingBottom: "0",
+      }}>
+        {TABS.map(({ id, icon, label }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            style={{
+              display: "flex", alignItems: "center", gap: "8px",
+              padding: "12px 20px", borderRadius: "10px 10px 0 0",
+              border: activeTab === id ? "1px solid var(--border-primary)" : "1px solid transparent",
+              borderBottom: activeTab === id ? "2px solid #7c3aed" : "2px solid transparent",
+              background: activeTab === id ? "var(--bg-card)" : "transparent",
+              color: activeTab === id ? "#c084fc" : "var(--text-muted)",
+              fontWeight: "700", fontSize: "14px", cursor: "pointer",
+              transition: "all 0.15s", marginBottom: "-2px",
+            }}
+          >
+            {icon} {label}
+          </button>
+        ))}
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* VIEW 1: CASCADE TIMELINE & AI STRESS REPORT                       */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* ── TAB: CASCADE TIMELINE ── */}
       {activeTab === "SIMULATION" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Simulated Cascade Events */}
-          <div className="card p-5 bg-slate-900/80 border-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-              <h2 className="text-xs font-bold text-slate-100 uppercase tracking-wider flex items-center gap-2">
-                <Activity size={14} className="text-purple-400" /> Simulated Event Progression (Hour +0{currentStep})
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+          {/* Event Log */}
+          <div style={{
+            background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+            borderRadius: "14px", padding: "24px",
+            display: "flex", flexDirection: "column", gap: "20px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h2 style={{ fontSize: "16px", fontWeight: "800", color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Activity size={18} color="#a78bfa" /> Simulated Event Progression
               </h2>
-              <span className="text-[10px] font-mono text-purple-400 bg-purple-950 px-2 py-0.5 rounded border border-purple-800">
-                Active Events: {Math.min(4, currentStep)}
+              <span style={{
+                fontSize: "12px", fontWeight: "800", color: "#a78bfa",
+                background: "rgba(168,85,247,0.12)", border: "1px solid rgba(168,85,247,0.3)",
+                padding: "4px 12px", borderRadius: "8px",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                {Math.min(4, currentStep)} Events Active
               </span>
             </div>
 
-            <div className="space-y-3">
-              {[
-                {
-                  step: 1,
-                  title: "Monsoon Surge Cloudburst Initiation",
-                  desc: "Rainfall exceeds 110mm in 90 minutes. Sabarmati water gauge exceeds Danger Mark by 0.8m.",
-                  tag: "METEOROLOGICAL",
-                },
-                {
-                  step: 2,
-                  title: "Underpass Inundation & Traffic Arterial Severed",
-                  desc: "Akhbarnagar underpass submerged in 2.2m of water. 4 public transport buses stranded.",
-                  tag: "INFRASTRUCTURE",
-                },
-                {
-                  step: 3,
-                  title: "Civil Hospital Substation Power Trip",
-                  desc: "Emergency diesel generators activated. ICU life-support operating on secondary backup power.",
-                  tag: "CRITICAL_FACILITY",
-                },
-                {
-                  step: 4,
-                  title: "Secondary Industrial Chemical Tank Seepage",
-                  desc: "Floodwaters breach chemical retention basin at Narol GIDC. Low-grade organic solvent leak detected.",
-                  tag: "HAZMAT_ESCALATION",
-                },
-              ]
-                .filter((ev) => ev.step <= currentStep)
-                .map((ev) => (
-                  <div
-                    key={ev.step}
-                    className="p-3.5 bg-slate-950 rounded-lg border border-slate-800 space-y-1 hover:border-purple-900/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-100">{ev.title}</span>
-                      <span className="text-[10px] font-mono bg-blue-950 text-blue-300 px-2 py-0.5 rounded border border-blue-800">
-                        Hour +0{ev.step}:00
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-300">{ev.desc}</p>
-                    <div className="text-[10px] text-slate-500 font-mono pt-1">{ev.tag}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {CASCADE_EVENTS.filter((ev) => ev.step <= currentStep).map((ev) => (
+                <div key={ev.step} style={{
+                  padding: "18px 20px", background: "var(--bg-secondary)",
+                  borderRadius: "10px", border: `1px solid var(--border-primary)`,
+                  borderLeft: `4px solid ${ev.color}`,
+                  display: "flex", flexDirection: "column", gap: "8px",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                    <span style={{ fontSize: "15px", fontWeight: "700", color: "var(--text-primary)" }}>{ev.title}</span>
+                    <span style={{
+                      fontSize: "12px", fontWeight: "800", color: "#60a5fa",
+                      background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.25)",
+                      padding: "3px 10px", borderRadius: "6px",
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}>
+                      Hour +0{ev.step}:00
+                    </span>
+                  </div>
+                  <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: 0, lineHeight: 1.6 }}>{ev.desc}</p>
+                  <div style={{ fontSize: "11px", fontWeight: "800", color: ev.color, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.5px" }}>
+                    {ev.tag}
+                  </div>
+                </div>
+              ))}
+
+              {CASCADE_EVENTS.filter((ev) => ev.step <= currentStep).length === 0 && (
+                <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)", fontSize: "14px" }}>
+                  Run the simulation to observe cascade events...
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Stress Analysis */}
+          <div style={{
+            background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+            borderRadius: "14px", padding: "24px",
+            display: "flex", flexDirection: "column", gap: "20px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h2 style={{ fontSize: "16px", fontWeight: "800", color: "#c084fc", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Compass size={18} /> Sandbox Stress Findings
+              </h2>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+                Monte Carlo Engine v2.4
+              </span>
+            </div>
+
+            <div style={{
+              padding: "18px", background: "var(--bg-secondary)",
+              borderRadius: "10px", border: "1px solid var(--border-primary)",
+            }}>
+              <div style={{ fontSize: "13px", fontWeight: "800", color: "var(--text-secondary)", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Finding at Hour +0{currentStep}:00:
+              </div>
+              <p style={{ fontSize: "14px", color: "var(--text-primary)", margin: 0, lineHeight: 1.7 }}>
+                {currentStep <= 2
+                  ? "Initial response capacity is adequate. Inflatable boat fleet is sufficient for Sector 4 rescue operations, but water rise rate of 0.15m/hr will strain single-boat units by Hour +03."
+                  : currentStep <= 4
+                  ? "CRITICAL BOTTLENECK PROJECTED: ICU bed capacity in North Zone will reach exhaustion within 45 minutes if casualties continue at simulated rate. Recommend preemptively pre-alerting VS Hospital and pre-staging 50 field beds."
+                  : "MAXIMUM SEVERITY BREACH: Multi-agency cross-district mutual aid required. Reserve boat fleets from Gandhinagar must be requested immediately."}
+              </p>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ fontSize: "13px", fontWeight: "800", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Prescribed Contingency Protocols:
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {[
+                  { color: "#4ade80", bg: "rgba(74,222,128,0.08)", border: "rgba(74,222,128,0.25)", text: "Re-route non-critical ambulance traffic away from Akhbarnagar underpass" },
+                  { color: "#60a5fa", bg: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.25)", text: "Pre-stage 3 high-capacity dewatering pump trucks at Narol Gate" },
+                ].map(({ color, bg, border, text }, i) => (
+                  <div key={i} style={{
+                    padding: "14px 16px", background: bg, borderRadius: "10px",
+                    border: `1px solid ${border}`,
+                    display: "flex", alignItems: "flex-start", gap: "12px",
+                  }}>
+                    <CheckCircle size={18} color={color} style={{ flexShrink: 0, marginTop: "1px" }} />
+                    <span style={{ fontSize: "14px", color: "var(--text-secondary)", lineHeight: 1.5 }}>{text}</span>
                   </div>
                 ))}
-            </div>
-          </div>
-
-          {/* Digital Twin Stress Analysis */}
-          <div className="card p-5 bg-slate-900/80 border-slate-800 space-y-4 flex flex-col justify-between">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                <h2 className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-                  <Compass size={14} /> Sandbox Stress Findings
-                </h2>
-                <span className="text-[10px] font-mono text-slate-400">Monte Carlo Engine v2.4</span>
-              </div>
-
-              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2 text-xs text-slate-300 leading-relaxed">
-                <div className="font-bold text-slate-100 flex items-center gap-1.5">
-                  <span>Finding at Hour +0{currentStep}:00:</span>
-                </div>
-                <p>
-                  {currentStep <= 2
-                    ? "Initial response capacity is adequate. Inflatable boat fleet is sufficient for Sector 4 rescue operations, but water rise rate of 0.15m/hr will strain single-boat units by Hour +03."
-                    : currentStep <= 4
-                    ? "CRITICAL BOTTLENECK PROJECTED: ICU bed capacity in North Zone will reach exhaustion within 45 minutes if casualties continue at simulated rate. Recommend preemptively pre-alerting VS Hospital and pre-staging 50 field beds."
-                    : "MAXIMUM SEVERITY BREACH: Multi-agency cross-district mutual aid required. Reserve boat fleets from Gandhinagar must be requested."}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-[10px] font-bold text-slate-400 uppercase font-mono">
-                  Prescribed Contingency Protocols:
-                </div>
-                <div className="space-y-1.5 text-xs">
-                  <div className="p-2.5 bg-emerald-950/40 border border-emerald-900/60 rounded text-emerald-300 flex items-center gap-2">
-                    <CheckCircle size={14} className="text-emerald-400 shrink-0" />
-                    <span>Re-route non-critical ambulance traffic away from Akhbarnagar underpass</span>
-                  </div>
-                  <div className="p-2.5 bg-blue-950/40 border border-blue-900/60 rounded text-blue-300 flex items-center gap-2">
-                    <CheckCircle size={14} className="text-blue-400 shrink-0" />
-                    <span>Pre-stage 3 high-capacity dewatering pump trucks at Narol Gate</span>
-                  </div>
-                </div>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-800 text-[11px] text-slate-500 font-mono flex items-center justify-between">
+            <div style={{
+              paddingTop: "16px", borderTop: "1px solid var(--border-primary)",
+              display: "flex", justifyContent: "space-between",
+              fontSize: "12px", color: "var(--text-muted)",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}>
               <span>Model State: Converged</span>
-              <span>Simulation ID: {selectedScenario?.id || "N/A"}</span>
+              <span>Sim ID: {selectedScenario?.id?.slice(0, 12) || "N/A"}...</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* VIEW 2: SIMULATED FLEET STATE                                      */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* ── TAB: FLEET STATE ── */}
       {activeTab === "FLEET_STATE" && (
-        <div className="card p-5 bg-slate-900/80 border-slate-800 space-y-4">
+        <div style={{
+          background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+          borderRadius: "14px", padding: "28px", display: "flex", flexDirection: "column", gap: "24px",
+        }}>
           <div>
-            <h2 className="text-xs font-bold text-slate-100 uppercase tracking-wider flex items-center gap-2">
-              <Layers size={14} className="text-purple-400" /> Simulated Resource Fleet Dynamics (Step {currentStep})
+            <h2 style={{ fontSize: "18px", fontWeight: "800", color: "var(--text-primary)", margin: "0 0 6px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <Layers size={20} color="#a78bfa" /> Simulated Fleet Degradation — Step {currentStep}
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Simulates real-world equipment attrition, transit latency, and operational fatigue over duration of disaster
+            <p style={{ fontSize: "14px", color: "var(--text-muted)", margin: 0 }}>
+              Simulates equipment attrition, transit latency, and operational fatigue over disaster duration.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "18px" }}>
             {simulatedResources.map((res, idx) => (
-              <div
-                key={idx}
-                className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-100">{res.type}</span>
-                  <span className="text-[10px] font-mono text-slate-400">{res.total} Total</span>
-                </div>
-
-                <div className="space-y-1.5 text-xs font-mono">
-                  <div className="flex items-center justify-between text-emerald-400">
-                    <span>Available / Standby:</span>
-                    <span className="font-bold">{res.available}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-blue-400">
-                    <span>Deployed in Sandbox:</span>
-                    <span className="font-bold">{res.deployed}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-red-400">
-                    <span>Damaged / Stranded:</span>
-                    <span className="font-bold">{res.exhaustedOrDamaged}</span>
-                  </div>
-                </div>
-
-                {/* Micro Progress Bar */}
-                <div className="w-full bg-slate-900 rounded-full h-2 flex overflow-hidden">
-                  <div
-                    style={{ width: `${(res.deployed / res.total) * 100}%` }}
-                    className="bg-blue-500 h-full"
-                    title="Deployed"
-                  />
-                  <div
-                    style={{ width: `${(res.available / res.total) * 100}%` }}
-                    className="bg-emerald-500 h-full"
-                    title="Available"
-                  />
-                  <div
-                    style={{ width: `${(res.exhaustedOrDamaged / res.total) * 100}%` }}
-                    className="bg-red-500 h-full"
-                    title="Damaged"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* VIEW 3: CASCADE RISKS MATRIX                                       */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {activeTab === "CASCADE_RISKS" && (
-        <div className="card p-5 bg-slate-900/80 border-slate-800 space-y-4">
-          <div>
-            <h2 className="text-xs font-bold text-slate-100 uppercase tracking-wider flex items-center gap-2">
-              <AlertTriangle size={14} className="text-amber-400" /> Subsystem Cascade Risk Breakdown
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Probabilistic modeling of secondary failures across critical urban lifelines
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {cascadeRisks.map((cr, idx) => (
-              <div
-                key={idx}
-                className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-100">{cr.subsystem}</span>
-                  <span
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                      cr.riskScore > 75
-                        ? "bg-red-950 text-red-300 border-red-800"
-                        : "bg-amber-950 text-amber-300 border-amber-800"
-                    }`}
-                  >
-                    {cr.riskScore}% Risk
+              <div key={idx} style={{
+                padding: "22px", background: "var(--bg-secondary)",
+                borderRadius: "12px", border: "1px solid var(--border-primary)",
+                display: "flex", flexDirection: "column", gap: "16px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)" }}>{res.type}</span>
+                  <span style={{
+                    fontSize: "13px", fontWeight: "800", color: "var(--text-muted)",
+                    background: "var(--bg-card)", padding: "4px 12px",
+                    borderRadius: "8px", border: "1px solid var(--border-primary)",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    {res.total} Total
                   </span>
                 </div>
 
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between text-slate-400 font-mono text-[11px]">
-                    <span>Current Status:</span>
-                    <strong className="text-amber-400">{cr.status}</strong>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {[
+                    { label: "Available / Standby", value: res.available, color: "#4ade80" },
+                    { label: "Deployed in Sandbox", value: res.deployed, color: "#60a5fa" },
+                    { label: "Damaged / Stranded", value: res.exhaustedOrDamaged, color: "#f87171" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{label}</span>
+                      <span style={{ fontSize: "18px", fontWeight: "900", color, fontFamily: "'JetBrains Mono', monospace" }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Utilization bar */}
+                <div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", fontWeight: "700" }}>
+                    Fleet Utilization
                   </div>
-                  <div className="flex justify-between text-slate-400 font-mono text-[11px]">
-                    <span>Time to Breach:</span>
-                    <strong className="text-red-400">{cr.timeToBreach}</strong>
+                  <div style={{ height: "10px", borderRadius: "6px", overflow: "hidden", background: "var(--bg-card)", border: "1px solid var(--border-primary)", display: "flex" }}>
+                    <div style={{ width: `${(res.deployed / res.total) * 100}%`, background: "#3b82f6" }} title="Deployed" />
+                    <div style={{ width: `${(res.available / res.total) * 100}%`, background: "#22c55e" }} title="Available" />
+                    <div style={{ width: `${(res.exhaustedOrDamaged / res.total) * 100}%`, background: "#ef4444" }} title="Damaged" />
+                  </div>
+                  <div style={{ display: "flex", gap: "12px", marginTop: "6px", fontSize: "11px", color: "var(--text-muted)", fontWeight: "600" }}>
+                    <span style={{ color: "#3b82f6" }}>■ Deployed</span>
+                    <span style={{ color: "#22c55e" }}>■ Available</span>
+                    <span style={{ color: "#ef4444" }}>■ Damaged</span>
                   </div>
                 </div>
               </div>
@@ -726,210 +708,299 @@ export default function SimulationPage() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* VIEW 4: LIVE VS. SIMULATED SCENARIO COMPARISON                     */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* ── TAB: CASCADE RISKS ── */}
+      {activeTab === "CASCADE_RISKS" && (
+        <div style={{
+          background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+          borderRadius: "14px", padding: "28px", display: "flex", flexDirection: "column", gap: "24px",
+        }}>
+          <div>
+            <h2 style={{ fontSize: "18px", fontWeight: "800", color: "var(--text-primary)", margin: "0 0 6px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <AlertTriangle size={20} color="#fbbf24" /> Subsystem Cascade Risk Breakdown
+            </h2>
+            <p style={{ fontSize: "14px", color: "var(--text-muted)", margin: 0 }}>
+              Probabilistic modeling of secondary failures across critical urban lifelines.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "18px" }}>
+            {cascadeRisks.map((cr, idx) => {
+              const isCritical = cr.riskScore > 50;
+              return (
+                <div key={idx} style={{
+                  padding: "22px", background: "var(--bg-secondary)",
+                  borderRadius: "12px",
+                  borderStyle: "solid", borderTopWidth: "1px", borderRightWidth: "1px",
+                  borderBottomWidth: "1px", borderLeftWidth: "4px",
+                  borderTopColor: "var(--border-primary)", borderRightColor: "var(--border-primary)",
+                  borderBottomColor: "var(--border-primary)",
+                  borderLeftColor: isCritical ? "#ef4444" : "#f59e0b",
+                  display: "flex", flexDirection: "column", gap: "16px",
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px" }}>
+                    <span style={{ fontSize: "15px", fontWeight: "700", color: "var(--text-primary)", lineHeight: 1.3 }}>{cr.subsystem}</span>
+                    <span style={{
+                      fontSize: "14px", fontWeight: "900",
+                      color: isCritical ? "#f87171" : "#fbbf24",
+                      fontFamily: "'JetBrains Mono', monospace", flexShrink: 0,
+                    }}>
+                      {cr.riskScore}%
+                    </span>
+                  </div>
+
+                  {/* Risk gauge */}
+                  <div style={{ height: "8px", borderRadius: "4px", background: "var(--bg-card)", overflow: "hidden" }}>
+                    <div style={{
+                      width: `${cr.riskScore}%`, height: "100%",
+                      background: isCritical
+                        ? "linear-gradient(90deg, #f59e0b, #ef4444)"
+                        : "linear-gradient(90deg, #4ade80, #f59e0b)",
+                      transition: "width 0.3s ease",
+                    }} />
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                      <span style={{ color: "var(--text-muted)" }}>Current Status</span>
+                      <strong style={{ color: "#fbbf24", fontFamily: "'JetBrains Mono', monospace" }}>{cr.status}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                      <span style={{ color: "var(--text-muted)" }}>Time to Breach</span>
+                      <strong style={{ color: "#f87171", fontFamily: "'JetBrains Mono', monospace" }}>{cr.timeToBreach}</strong>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: COMPARISON ── */}
       {activeTab === "COMPARISON" && (
-        <div className="card p-6 bg-slate-900/80 border-slate-800 space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div style={{
+          background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+          borderRadius: "14px", padding: "28px", display: "flex", flexDirection: "column", gap: "24px",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-primary)", paddingBottom: "18px" }}>
             <div>
-              <h2 className="text-sm font-bold text-slate-100 uppercase tracking-wider flex items-center gap-2">
-                <BarChart2 size={16} className="text-purple-400" /> Digital Twin vs. Live Operational Baseline
+              <h2 style={{ fontSize: "18px", fontWeight: "800", color: "var(--text-primary)", margin: "0 0 6px", display: "flex", alignItems: "center", gap: "10px" }}>
+                <BarChart2 size={20} color="#a78bfa" /> Digital Twin vs. Live Operational Baseline
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Evaluates simulated catastrophe escalation against current live telemetry in real-time
+              <p style={{ fontSize: "14px", color: "var(--text-muted)", margin: 0 }}>
+                Evaluates simulated catastrophe escalation against current live telemetry in real-time.
               </p>
             </div>
             <button
               onClick={fetchComparison}
               disabled={loadingComparison}
-              className="btn-secondary text-xs py-1 px-3"
+              style={{
+                padding: "10px 18px", background: "var(--bg-secondary)",
+                border: "1px solid var(--border-primary)", borderRadius: "8px",
+                color: "var(--text-secondary)", fontSize: "14px", fontWeight: "600",
+                cursor: "pointer", flexShrink: 0,
+              }}
             >
               {loadingComparison ? "Comparing..." : "Refresh Baseline"}
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Column 1: Live Operational Baseline */}
-            <div className="p-5 bg-slate-950 rounded-xl border border-emerald-900/40 space-y-3">
-              <div className="flex items-center justify-between border-b border-emerald-900/30 pb-2">
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <CheckCircle size={14} /> Live Operational Baseline
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            {/* Live Baseline */}
+            <div style={{
+              padding: "24px", background: "rgba(74,222,128,0.05)",
+              borderRadius: "12px", border: "1px solid rgba(74,222,128,0.25)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(74,222,128,0.2)", paddingBottom: "14px", marginBottom: "18px" }}>
+                <span style={{ fontSize: "15px", fontWeight: "800", color: "#4ade80", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <CheckCircle size={16} /> Live Operational Baseline
                 </span>
-                <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-800">
-                  REAL-TIME CAD FEED
-                </span>
+                <span style={{
+                  fontSize: "11px", fontWeight: "800", color: "#4ade80",
+                  background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)",
+                  padding: "3px 10px", borderRadius: "6px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}>REAL-TIME CAD</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-                <div className="p-2.5 bg-slate-900/60 rounded">
-                  <span className="text-[10px] text-slate-500 block">AFFECTED POPULATION</span>
-                  <span className="text-base font-bold text-slate-100">
-                    {comparisonData?.liveBaseline?.affected || 145}
-                  </span>
-                </div>
-                <div className="p-2.5 bg-slate-900/60 rounded">
-                  <span className="text-[10px] text-slate-500 block">CASUALTIES</span>
-                  <span className="text-base font-bold text-slate-100">
-                    {comparisonData?.liveBaseline?.casualties || 17}
-                  </span>
-                </div>
-                <div className="p-2.5 bg-slate-900/60 rounded">
-                  <span className="text-[10px] text-slate-500 block">HOSPITAL STRAIN</span>
-                  <span className="text-base font-bold text-slate-100">
-                    {comparisonData?.liveBaseline?.hospitalStrain || 75}%
-                  </span>
-                </div>
-                <div className="p-2.5 bg-slate-900/60 rounded">
-                  <span className="text-[10px] text-slate-500 block">BLOCKED ROADS</span>
-                  <span className="text-base font-bold text-slate-100">
-                    {comparisonData?.liveBaseline?.roadsBlocked || 1}
-                  </span>
-                </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                {[
+                  { label: "AFFECTED POPULATION", value: comparisonData?.liveBaseline?.affected || 145 },
+                  { label: "CASUALTIES", value: comparisonData?.liveBaseline?.casualties || 17 },
+                  { label: "HOSPITAL STRAIN", value: `${comparisonData?.liveBaseline?.hospitalStrain || 75}%` },
+                  { label: "BLOCKED ROADS", value: comparisonData?.liveBaseline?.roadsBlocked || 1 },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ padding: "14px", background: "var(--bg-secondary)", borderRadius: "10px", border: "1px solid var(--border-primary)" }}>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{label}</div>
+                    <div style={{ fontSize: "22px", fontWeight: "900", color: "var(--text-primary)", fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Column 2: Digital Twin Simulated Twin */}
-            <div className="p-5 bg-slate-950 rounded-xl border border-purple-900/40 space-y-3">
-              <div className="flex items-center justify-between border-b border-purple-900/30 pb-2">
-                <span className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity size={14} /> Simulated Twin at Hour +0{currentStep}
+            {/* Digital Twin */}
+            <div style={{
+              padding: "24px", background: "rgba(168,85,247,0.05)",
+              borderRadius: "12px", border: "1px solid rgba(168,85,247,0.25)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(168,85,247,0.2)", paddingBottom: "14px", marginBottom: "18px" }}>
+                <span style={{ fontSize: "15px", fontWeight: "800", color: "#c084fc", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Activity size={16} /> Simulated Twin — Hour +0{currentStep}
                 </span>
-                <span className="text-[10px] font-mono bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800">
-                  ISOLATED SANDBOX
-                </span>
+                <span style={{
+                  fontSize: "11px", fontWeight: "800", color: "#c084fc",
+                  background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)",
+                  padding: "3px 10px", borderRadius: "6px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}>SANDBOX</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-                <div className="p-2.5 bg-slate-900/60 rounded">
-                  <span className="text-[10px] text-slate-500 block">SIMULATED AFFECTED</span>
-                  <span className="text-base font-bold text-purple-300">{metrics.affectedCount}</span>
-                </div>
-                <div className="p-2.5 bg-slate-900/60 rounded">
-                  <span className="text-[10px] text-slate-500 block">SIMULATED CASUALTIES</span>
-                  <span className="text-base font-bold text-red-400">{metrics.casualtyCount}</span>
-                </div>
-                <div className="p-2.5 bg-slate-900/60 rounded">
-                  <span className="text-[10px] text-slate-500 block">HOSPITAL STRAIN</span>
-                  <span className="text-base font-bold text-amber-400">{metrics.hospitalStrain}%</span>
-                </div>
-                <div className="p-2.5 bg-slate-900/60 rounded">
-                  <span className="text-[10px] text-slate-500 block">BLOCKED ROADS</span>
-                  <span className="text-base font-bold text-purple-400">{metrics.roadsBlocked}</span>
-                </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                {[
+                  { label: "SIMULATED AFFECTED", value: metrics.affectedCount, color: "#c084fc" },
+                  { label: "SIMULATED CASUALTIES", value: metrics.casualtyCount, color: "#f87171" },
+                  { label: "HOSPITAL STRAIN", value: `${metrics.hospitalStrain}%`, color: "#fbbf24" },
+                  { label: "BLOCKED ROADS", value: metrics.roadsBlocked, color: "#c084fc" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ padding: "14px", background: "var(--bg-secondary)", borderRadius: "10px", border: "1px solid var(--border-primary)" }}>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{label}</div>
+                    <div style={{ fontSize: "22px", fontWeight: "900", color, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Comparison Insights */}
-          <div className="space-y-2 pt-2 border-t border-slate-800">
-            <span className="text-[10px] font-mono uppercase text-slate-400 font-bold">
+          {/* Insights */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", paddingTop: "4px" }}>
+            <div style={{ fontSize: "14px", fontWeight: "800", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
               Digital Twin Strategic Comparison Insights:
-            </span>
-            <div className="space-y-1.5 text-xs text-slate-300">
-              {comparisonData?.comparisonNotes?.map((note: string, i: number) => (
-                <div key={i} className="p-2.5 bg-slate-950/60 rounded border border-slate-800/80 flex items-start gap-2">
-                  <span className="text-purple-400 font-mono">•</span>
-                  <span>{note}</span>
-                </div>
-              )) || (
-                <div className="p-2.5 bg-slate-950/60 rounded border border-slate-800/80">
-                  Digital Twin indicates casualty load will increase by 240% if riverfront evacuation is delayed past Hour +03.
-                </div>
-              )}
             </div>
+            {(comparisonData?.comparisonNotes || [
+              "Digital Twin indicates casualty load will increase by 240% if riverfront evacuation is delayed past Hour +03.",
+            ]).map((note: string, i: number) => (
+              <div key={i} style={{
+                padding: "16px 18px", background: "var(--bg-secondary)",
+                borderRadius: "10px", border: "1px solid var(--border-primary)",
+                display: "flex", alignItems: "flex-start", gap: "12px",
+                fontSize: "14px", color: "var(--text-secondary)", lineHeight: 1.6,
+              }}>
+                <span style={{ color: "#a78bfa", fontWeight: "900", marginTop: "2px" }}>●</span>
+                {note}
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* SCENARIO CREATION MODAL                                            */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* ── CREATE SCENARIO MODAL ── */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 50,
+          background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: "16px",
+        }}>
           <form
             onSubmit={handleCreateScenario}
-            className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl"
+            style={{
+              background: "var(--bg-card)", border: "1px solid var(--border-secondary)",
+              borderRadius: "16px", maxWidth: "560px", width: "100%",
+              padding: "32px", boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
+              display: "flex", flexDirection: "column", gap: "20px",
+            }}
           >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <Plus size={16} className="text-purple-400" />
-                Configure Disaster Simulation Scenario
-              </h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-primary)", paddingBottom: "18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{
+                  width: "40px", height: "40px", borderRadius: "10px",
+                  background: "rgba(168,85,247,0.12)", border: "1px solid rgba(168,85,247,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Plus size={18} color="#c084fc" />
+                </div>
+                <h3 style={{ fontSize: "18px", fontWeight: "800", color: "var(--text-primary)", margin: 0 }}>
+                  Configure Simulation Scenario
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-slate-200 text-xs px-1"
+                style={{ background: "transparent", border: "1px solid var(--border-primary)", borderRadius: "6px", color: "var(--text-muted)", cursor: "pointer", padding: "6px 10px" }}
               >
-                ✕
+                <X size={16} />
               </button>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-mono text-slate-400 uppercase">Scenario Name:</label>
+            <div>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                Scenario Name *
+              </label>
               <input
-                type="text"
-                required
-                placeholder="e.g. Sabarmati Breach & East Industrial Firestorm"
-                value={newScenName}
+                type="text" required value={newScenName}
                 onChange={(e) => setNewScenName(e.target.value)}
-                className="input-base text-xs bg-slate-950 w-full"
+                placeholder="e.g. Sabarmati Breach & East Industrial Firestorm"
+                style={inputStyle}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono text-slate-400 uppercase">Disaster Type:</label>
-                <select
-                  value={newScenType}
-                  onChange={(e) => setNewScenType(e.target.value)}
-                  className="input-base text-xs bg-slate-950 w-full"
-                >
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                  Disaster Type
+                </label>
+                <select value={newScenType} onChange={(e) => setNewScenType(e.target.value)} style={inputStyle}>
                   <option value="FLOOD">FLOOD (Hydrological)</option>
                   <option value="HAZMAT">HAZMAT (Industrial Toxic)</option>
-                  <option value="ROAD_ACCIDENT">ROAD ACCIDENT (Transit Gridlock)</option>
-                  <option value="FIRE">FIRE (Multi-Sector Conflagration)</option>
+                  <option value="ROAD_ACCIDENT">ROAD ACCIDENT</option>
+                  <option value="FIRE">FIRE (Multi-Sector)</option>
                 </select>
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono text-slate-400 uppercase">Atmospheric Weather:</label>
-                <input
-                  type="text"
-                  value={newWeather}
-                  onChange={(e) => setNewWeather(e.target.value)}
-                  className="input-base text-xs bg-slate-950 w-full"
-                />
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                  Weather Conditions
+                </label>
+                <input type="text" value={newWeather} onChange={(e) => setNewWeather(e.target.value)} style={inputStyle} />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-mono text-slate-400 uppercase">Description & Tactical Objectives:</label>
+            <div>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                Description & Tactical Objectives
+              </label>
               <textarea
-                rows={3}
-                placeholder="Describe scenario parameters, primary failure points, and response goals..."
-                value={newScenDesc}
+                rows={3} value={newScenDesc}
                 onChange={(e) => setNewScenDesc(e.target.value)}
-                className="input-base text-xs bg-slate-950 w-full resize-none"
+                placeholder="Describe scenario parameters, primary failure points, and response goals..."
+                style={{ ...inputStyle, resize: "vertical" }}
               />
             </div>
 
-            <div className="p-3 bg-amber-950/30 border border-amber-900/40 rounded-lg text-[10px] text-amber-300 font-mono">
-              🔒 Scenario will be generated with 3 initial cascade timeline events. Live production database will not be altered.
+            <div style={{
+              padding: "14px 16px", background: "rgba(120,53,15,0.2)",
+              border: "1px solid rgba(217,119,6,0.35)", borderRadius: "10px",
+              fontSize: "13px", color: "#fde68a",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}>
+              🔒 Scenario will be generated with 3 cascade events. Live production DB will not be altered.
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", paddingTop: "8px", borderTop: "1px solid var(--border-primary)" }}>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="btn-secondary text-xs px-3 py-1.5"
+                style={{ padding: "10px 20px", background: "transparent", border: "1px solid var(--border-primary)", borderRadius: "8px", color: "var(--text-muted)", cursor: "pointer", fontSize: "14px" }}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={creatingScen || !newScenName.trim()}
-                className="btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5"
+                style={{
+                  padding: "10px 24px",
+                  background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+                  border: "none", borderRadius: "8px", color: "#fff",
+                  fontWeight: "700", fontSize: "14px", cursor: "pointer",
+                  opacity: (creatingScen || !newScenName.trim()) ? 0.6 : 1,
+                  boxShadow: "0 4px 16px rgba(124,58,237,0.4)",
+                }}
               >
                 {creatingScen ? "Initializing..." : "Create Sandbox Scenario"}
               </button>
