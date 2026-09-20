@@ -149,44 +149,46 @@ export function DispatchRecommendationCard({
 
   return (
     <div
-      className={`card p-5 space-y-4 transition-all duration-200 relative ${
+      className={`card p-6 sm:p-8 rounded-3xl space-y-6 sm:space-y-7 transition-all duration-300 relative shadow-xl hover:shadow-2xl ${
         isTopPick
-          ? "border-blue-500/70 bg-gradient-to-br from-slate-900 via-blue-950/20 to-slate-900 ring-1 ring-blue-500/50 shadow-lg shadow-blue-950/30"
-          : "border-slate-800 bg-slate-900/70 hover:border-slate-700"
+          ? "border-blue-500/80 bg-gradient-to-br from-slate-900 via-blue-950/30 to-slate-900 ring-2 ring-blue-500/40 shadow-blue-950/40"
+          : "border-slate-800 bg-slate-900/80 hover:border-slate-700"
       }`}
     >
       {/* Top Banner & Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-950/60 border border-blue-800/60 flex items-center justify-center flex-shrink-0 text-blue-400">
-            <Shield size={20} />
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-blue-950/80 border border-blue-800/80 flex items-center justify-center flex-shrink-0 text-blue-400 shadow-inner">
+            <Shield size={24} />
           </div>
 
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
               {isTopPick && (
-                <span className="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                <span className="text-xs font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase tracking-wider font-mono shadow-md">
                   Primary Recommendation
                 </span>
               )}
-              <span className="text-[10px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+              <span className="text-xs font-mono font-bold bg-slate-800/90 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60">
                 Rank #{rank + 1}
               </span>
-              <h3 className="text-base font-bold text-slate-100 tracking-tight">{resource.name}</h3>
+              <h3 className="text-lg sm:text-xl font-black text-slate-100 dark:text-slate-100 tracking-tight truncate">
+                {resource.name}
+              </h3>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-400">
               {resource.agency && (
-                <span className="text-[11px] font-semibold text-slate-300">
+                <span className="text-xs font-semibold text-slate-200 font-mono bg-slate-800/70 px-2 py-0.5 rounded-md border border-slate-700/60">
                   {resource.agency.name}
                 </span>
               )}
               <span>•</span>
-              <span className="font-mono text-[11px] text-slate-400">
+              <span className="font-mono text-xs text-slate-300">
                 {resource.type.replace(/_/g, " ")}
               </span>
               <span>•</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-800">
+              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-950/80 text-emerald-300 border border-emerald-800">
                 {resource.status}
               </span>
             </div>
@@ -194,15 +196,15 @@ export function DispatchRecommendationCard({
         </div>
 
         {/* Score Ring & Telemetry Trust */}
-        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800/60">
+        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-800/80">
           <div className="flex items-baseline gap-1.5">
-            <div className="text-2xl font-black font-mono text-blue-400">{scorePercent}</div>
-            <span className="text-xs font-mono text-slate-400">/100</span>
+            <div className="text-3xl sm:text-4xl font-black font-mono text-blue-400">{scorePercent}</div>
+            <span className="text-sm font-mono text-slate-400">/100</span>
           </div>
 
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1.5 text-xs font-mono">
             <span
-              className={`w-1.5 h-1.5 rounded-full ${
+              className={`w-2 h-2 rounded-full ${
                 telemetry.status === "live"
                   ? "bg-emerald-400 animate-ping"
                   : telemetry.status === "recent"
@@ -213,7 +215,7 @@ export function DispatchRecommendationCard({
             <span
               className={
                 telemetry.status === "live"
-                  ? "text-emerald-400"
+                  ? "text-emerald-400 font-bold"
                   : telemetry.status === "recent"
                   ? "text-amber-400"
                   : "text-slate-500"
@@ -225,67 +227,73 @@ export function DispatchRecommendationCard({
         </div>
       </div>
 
-      {/* Proximity & ETA Badges */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-        <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800 flex items-center gap-2">
-          <Clock size={15} className="text-amber-400 flex-shrink-0" />
+      {/* Proximity & ETA Grid Badges */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+        <div className="p-4 bg-slate-950/70 rounded-2xl border border-slate-800 flex items-center gap-3 shadow-inner">
+          <div className="w-10 h-10 rounded-xl bg-amber-950/60 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0">
+            <Clock size={18} />
+          </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase font-mono text-slate-400">Estimated ETA</div>
-            <div className="font-bold text-slate-200">
+            <div className="text-[11px] uppercase font-mono text-slate-400 font-semibold">Estimated ETA</div>
+            <div className="text-base font-bold text-slate-100 font-mono">
               {recommendation.etaMinutes !== null ? `~${recommendation.etaMinutes} mins` : "Uncalculated"}
             </div>
           </div>
         </div>
 
-        <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800 flex items-center gap-2">
-          <MapPin size={15} className="text-blue-400 flex-shrink-0" />
+        <div className="p-4 bg-slate-950/70 rounded-2xl border border-slate-800 flex items-center gap-3 shadow-inner">
+          <div className="w-10 h-10 rounded-xl bg-blue-950/60 border border-blue-800/60 flex items-center justify-center text-blue-400 shrink-0">
+            <MapPin size={18} />
+          </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase font-mono text-slate-400">Route Distance</div>
-            <div className="font-bold text-slate-200">
+            <div className="text-[11px] uppercase font-mono text-slate-400 font-semibold">Route Distance</div>
+            <div className="text-base font-bold text-slate-100 font-mono">
               {recommendation.distanceKm !== null ? `${recommendation.distanceKm} km` : "Coordinates Pending"}
             </div>
           </div>
         </div>
 
-        <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800 flex items-center gap-2">
-          <Shield size={15} className="text-emerald-400 flex-shrink-0" />
+        <div className="p-4 bg-slate-950/70 rounded-2xl border border-slate-800 flex items-center gap-3 shadow-inner">
+          <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-800/60 flex items-center justify-center text-emerald-400 shrink-0">
+            <Shield size={18} />
+          </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase font-mono text-slate-400">Reliability & Load</div>
-            <div className="font-bold text-slate-200">
-              {Math.round((resource.reliabilityScore ?? 1.0) * 100)}% rating ({resource.currentWorkload ?? 0}% load)
+            <div className="text-[11px] uppercase font-mono text-slate-400 font-semibold">Reliability & Load</div>
+            <div className="text-base font-bold text-slate-100 font-mono">
+              {Math.round((resource.reliabilityScore ?? 1.0) * 100)}% ({resource.currentWorkload ?? 0}% load)
             </div>
           </div>
         </div>
       </div>
 
       {/* Estimated ETA Disclaimer Notice */}
-      <div className="flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-950/40 px-2.5 py-1 rounded border border-slate-800/60">
-        <Info size={12} className="text-slate-500 flex-shrink-0" />
+      <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-950/50 px-3.5 py-2 rounded-xl border border-slate-800/70 font-sans">
+        <Info size={14} className="text-blue-400 flex-shrink-0" />
         <span>
-          Estimated transit times are algorithmic approximations based on road vectors and fleet class speeds. Field road blocks may vary.
+          Estimated transit times are algorithmic approximations based on live road vectors and fleet class speeds.
         </span>
       </div>
 
       {/* Capability Match Matrix */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-[11px] uppercase font-mono text-slate-400">
-          <span>Required Capabilities Fulfillable</span>
+      <div className="space-y-2.5 p-4 bg-slate-950/40 rounded-2xl border border-slate-800/70">
+        <div className="flex items-center justify-between text-xs uppercase font-mono text-slate-400">
+          <span className="font-semibold">Required Capabilities Fulfillable</span>
           <span className="text-emerald-400 font-bold">{matchedCaps.length} Matched</span>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {matchedCaps.map((cap, idx) => (
             <span
               key={idx}
-              className="text-[11px] bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 px-2.5 py-0.5 rounded font-mono font-medium flex items-center gap-1"
+              className="text-xs bg-emerald-950/80 border border-emerald-800/90 text-emerald-300 px-3 py-1 rounded-xl font-mono font-semibold flex items-center gap-1.5 shadow-sm"
             >
-              <Check size={12} className="text-emerald-400" />
+              <Check size={13} className="text-emerald-400" />
               <span>{cap.replace(/_/g, " ")}</span>
             </span>
           ))}
           {missingCaps.length > 0 && (
-            <span className="text-[11px] bg-red-950/60 border border-red-800/80 text-red-300 px-2 py-0.5 rounded font-mono font-medium flex items-center gap-1">
-              <X size={12} className="text-red-400" />
+            <span className="text-xs bg-red-950/80 border border-red-800/90 text-red-300 px-3 py-1 rounded-xl font-mono font-semibold flex items-center gap-1.5 shadow-sm">
+              <X size={13} className="text-red-400" />
               <span>Missing: {missingCaps.join(", ")}</span>
             </span>
           )}
@@ -294,16 +302,16 @@ export function DispatchRecommendationCard({
 
       {/* Equipment Inventory */}
       {allEquipment.length > 0 && (
-        <div className="space-y-1 text-xs">
-          <div className="flex items-center gap-1 text-[10px] uppercase font-mono text-slate-400">
-            <Wrench size={11} className="text-amber-400" />
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-xs uppercase font-mono text-slate-400 font-semibold">
+            <Wrench size={13} className="text-amber-400" />
             <span>Verified Onboard Equipment</span>
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {allEquipment.map((eq, i) => (
               <span
                 key={i}
-                className="text-[10px] bg-slate-950 border border-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono"
+                className="text-xs bg-slate-950 border border-slate-800 text-slate-300 px-2.5 py-1 rounded-lg font-mono"
               >
                 {eq}
               </span>
@@ -313,12 +321,12 @@ export function DispatchRecommendationCard({
       )}
 
       {/* Explainable Reasons Summary */}
-      <div className="space-y-1.5">
-        <div className="text-[10px] uppercase font-mono text-slate-400">Matching Justification</div>
-        <div className="space-y-1">
+      <div className="space-y-2">
+        <div className="text-xs uppercase font-mono text-slate-400 font-semibold">Matching Justification</div>
+        <div className="space-y-1.5">
           {reasonsArr.map((r, i) => (
-            <div key={i} className="text-xs text-slate-300 flex items-start gap-1.5">
-              <span className="text-emerald-400 flex-shrink-0 mt-0.5">✓</span>
+            <div key={i} className="text-xs sm:text-sm text-slate-300 flex items-start gap-2">
+              <span className="text-emerald-400 flex-shrink-0 mt-0.5 font-bold">✓</span>
               <span>{r}</span>
             </div>
           ))}
@@ -326,32 +334,32 @@ export function DispatchRecommendationCard({
       </div>
 
       {/* Explainable Scoring Breakdown Accordion */}
-      <div className="pt-2 border-t border-slate-800/80">
+      <div className="pt-3 border-t border-slate-800/80">
         <button
           type="button"
           onClick={() => setShowBreakdown(!showBreakdown)}
-          className="text-xs font-mono text-blue-400 hover:text-blue-300 flex items-center justify-between w-full py-1"
+          className="text-xs font-mono font-semibold text-blue-400 hover:text-blue-300 flex items-center justify-between w-full py-1.5 cursor-pointer"
         >
-          <span className="flex items-center gap-1">
-            <Sliders size={12} />
+          <span className="flex items-center gap-2">
+            <Sliders size={14} />
             <span>Explainable Scoring Breakdown ({scoreBreakdown?.factors.length || 0} Factors)</span>
           </span>
-          {showBreakdown ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {showBreakdown ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
 
         {showBreakdown && (
-          <div className="mt-3 p-3 bg-slate-950/80 border border-slate-800 rounded-lg space-y-2 text-xs font-mono animate-slide-in">
-            <div className="text-[10px] text-slate-400 uppercase border-b border-slate-800 pb-1.5 flex justify-between font-bold">
+          <div className="mt-3.5 p-4 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-2.5 text-xs font-mono animate-slide-in shadow-inner">
+            <div className="text-[11px] text-slate-400 uppercase border-b border-slate-800 pb-2 flex justify-between font-bold">
               <span>Scoring Vector & Factor</span>
               <span>Point Impact</span>
             </div>
 
             {scoreBreakdown?.factors ? (
               scoreBreakdown.factors.map((f, i) => (
-                <div key={i} className="flex items-start justify-between gap-2 py-0.5 text-[11px]">
+                <div key={i} className="flex items-start justify-between gap-3 py-1 text-xs">
                   <div className="text-slate-300 flex-1">
                     <span className="font-semibold text-slate-200">{f.factor}:</span>{" "}
-                    <span className="text-slate-400 text-[10px]">{f.description}</span>
+                    <span className="text-slate-400 text-xs">{f.description}</span>
                   </div>
                   <span
                     className={`font-bold font-mono ${
@@ -367,24 +375,24 @@ export function DispatchRecommendationCard({
                 </div>
               ))
             ) : (
-              <div className="text-slate-500 text-[11px]">No granular breakdown telemetry available.</div>
+              <div className="text-slate-500 text-xs">No granular breakdown telemetry available.</div>
             )}
 
-            <div className="pt-2 border-t border-slate-800 flex justify-between font-bold text-xs">
+            <div className="pt-3 border-t border-slate-800 flex justify-between font-bold text-xs sm:text-sm">
               <span className="text-slate-200">Final Recommendation Score:</span>
-              <span className="text-blue-400">{scorePercent} / 100</span>
+              <span className="text-blue-400 font-black">{scorePercent} / 100</span>
             </div>
           </div>
         )}
       </div>
 
       {/* Human Approval / Rejection Action Controls */}
-      <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+      <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-4 flex-wrap">
         <button
           type="button"
           onClick={() => onReject(recommendation)}
           disabled={isProcessing}
-          className="btn-ghost text-xs px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-950/40 border-red-900/60"
+          className="btn-ghost text-xs sm:text-sm px-4 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-950/40 border-red-900/60 rounded-xl font-medium cursor-pointer"
         >
           Reject...
         </button>
@@ -393,9 +401,9 @@ export function DispatchRecommendationCard({
           type="button"
           onClick={() => onApprove(recommendation)}
           disabled={isProcessing}
-          className="btn-primary text-xs px-4 py-2 font-semibold shadow-lg shadow-blue-600/20 flex items-center gap-1.5"
+          className="btn-primary text-xs sm:text-sm px-6 py-2.5 font-bold shadow-xl shadow-blue-600/30 flex items-center gap-2 rounded-xl cursor-pointer"
         >
-          <CheckCircle2 size={14} />
+          <CheckCircle2 size={16} />
           <span>Authorize Dispatch</span>
         </button>
       </div>

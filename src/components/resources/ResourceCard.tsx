@@ -96,72 +96,38 @@ export function ResourceCard({
 
   return (
     <div
+      className="card p-6 sm:p-7 rounded-3xl space-y-6 flex flex-col justify-between shadow-xl hover:shadow-2xl transition-all duration-300 relative group border-slate-800"
       style={{
-        background: `linear-gradient(145deg, rgba(15, 23, 42, 0.85) 0%, rgba(10, 15, 30, 0.95) 100%)`,
-        border: "1px solid var(--border-primary)",
-        borderLeft: `4px solid ${accent.border}`,
-        borderRadius: "12px",
-        padding: "20px",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        gap: "14px",
-        transition: "transform 0.15s ease, border-color 0.15s ease",
+        borderLeft: `5px solid ${accent.border}`,
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      <div className="space-y-5">
         {/* 1. Unit Identity & Status Header */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3.5 min-w-0">
             <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner transition-transform group-hover:scale-105"
               style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "10px",
                 background: `${accent.border}15`,
                 border: `1px solid ${accent.border}35`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
+                color: accent.border,
               }}
             >
-              <TypeIcon size={20} color={accent.border} />
+              <TypeIcon size={24} />
             </div>
 
-            <div style={{ minWidth: 0 }}>
-              <h3
-                style={{
-                  fontSize: "15px",
-                  fontWeight: "700",
-                  color: "var(--text-primary)",
-                  letterSpacing: "-0.2px",
-                  margin: 0,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-slate-100 dark:text-slate-100 tracking-tight truncate">
                 {resource.name}
               </h3>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px", flexWrap: "wrap" }}>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {resource.agency && (
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: "500",
-                      color: "var(--text-secondary)",
-                      background: "rgba(255, 255, 255, 0.05)",
-                      padding: "1px 6px",
-                      borderRadius: "4px",
-                      border: "1px solid var(--border-primary)",
-                    }}
-                  >
+                  <span className="text-xs font-semibold text-slate-300 dark:text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700/60 font-mono">
                     {resource.agency.name}
                   </span>
                 )}
-                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                <span className="text-xs text-slate-400 font-mono">
                   {resource.type.replace(/_/g, " ")}
                 </span>
               </div>
@@ -169,58 +135,35 @@ export function ResourceCard({
           </div>
 
           {/* Right Status & Telemetry */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px", flexShrink: 0 }}>
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
             <ResourceStatusBadge status={resource.status} size="sm" />
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10.5px" }}>
+            <div className="flex items-center gap-1.5 text-[11px] font-mono">
               <span
+                className="w-2 h-2 rounded-full inline-block"
                 style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
                   background:
                     telemetry.status === "live"
                       ? "#22c55e"
                       : telemetry.status === "recent"
                       ? "#f59e0b"
                       : "#64748b",
-                  display: "inline-block",
                 }}
               />
-              <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>{telemetry.label}</span>
+              <span className="text-slate-400">{telemetry.label}</span>
             </div>
           </div>
         </div>
 
         {/* 2. Location & Coordinate Telemetry */}
-        <div
-          style={{
-            padding: "8px 12px",
-            background: "rgba(255, 255, 255, 0.02)",
-            borderRadius: "8px",
-            border: "1px solid var(--border-primary)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            fontSize: "12px",
-            gap: "8px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
-            <MapPin size={13} color="#60a5fa" style={{ flexShrink: 0 }} />
-            <span
-              style={{
-                color: resource.locationName ? "var(--text-secondary)" : "#f59e0b",
-                fontStyle: resource.locationName ? "normal" : "italic",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {resource.locationName || "Location unassigned"}
+        <div className="p-3.5 bg-slate-950/60 dark:bg-slate-950/60 rounded-2xl border border-slate-800/80 flex items-center justify-between text-xs gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <MapPin size={15} className="text-blue-400 flex-shrink-0" />
+            <span className="text-slate-300 dark:text-slate-300 font-medium truncate">
+              {resource.locationName || <span className="text-amber-400 italic font-mono">Location unassigned</span>}
             </span>
           </div>
 
-          <span className="technical" style={{ fontSize: "11px", color: "var(--text-muted)", flexShrink: 0 }}>
+          <span className="font-mono text-xs text-slate-400 flex-shrink-0">
             {resource.latitude && resource.longitude
               ? `${resource.latitude.toFixed(3)}, ${resource.longitude.toFixed(3)}`
               : "No GPS"}
@@ -228,47 +171,28 @@ export function ResourceCard({
         </div>
 
         {/* 3. Operational Readiness & Workload */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-          <div
-            style={{
-              padding: "8px 10px",
-              background: "rgba(255, 255, 255, 0.02)",
-              borderRadius: "8px",
-              border: "1px solid var(--border-primary)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5px" }}>
-              <span className="metric-label" style={{ fontSize: "11px" }}>Workload</span>
-              <span className="technical" style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-primary)" }}>
+        <div className="grid grid-cols-2 gap-3.5">
+          <div className="p-3.5 bg-slate-950/60 dark:bg-slate-950/60 rounded-2xl border border-slate-800/80 space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400 font-mono uppercase text-[11px]">Workload</span>
+              <span className="font-mono font-bold text-slate-200">
                 {workload}%
               </span>
             </div>
-            <div style={{ height: "4px", background: "rgba(255, 255, 255, 0.08)", borderRadius: "3px", overflow: "hidden" }}>
+            <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden">
               <div
                 style={{
                   width: `${Math.min(100, Math.max(0, workload))}%`,
-                  height: "100%",
                   background: workloadColor,
-                  borderRadius: "3px",
-                  transition: "width 0.3s",
                 }}
+                className="h-full rounded-full transition-all duration-500"
               />
             </div>
           </div>
 
-          <div
-            style={{
-              padding: "8px 10px",
-              background: "rgba(255, 255, 255, 0.02)",
-              borderRadius: "8px",
-              border: "1px solid var(--border-primary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <span className="metric-label" style={{ fontSize: "11px" }}>Reliability</span>
-            <span className="data-value" style={{ fontSize: "13px", fontWeight: "600", color: "#22c55e" }}>
+          <div className="p-3.5 bg-slate-950/60 dark:bg-slate-950/60 rounded-2xl border border-slate-800/80 flex items-center justify-between">
+            <span className="text-slate-400 font-mono uppercase text-[11px]">Reliability</span>
+            <span className="font-mono font-bold text-emerald-400 text-sm">
               {reliabilityPct}%
             </span>
           </div>
@@ -276,31 +200,23 @@ export function ResourceCard({
 
         {/* 4. Capabilities Matrix */}
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+          <div className="flex items-center gap-2 flex-wrap">
             {resource.capabilities && resource.capabilities.length > 0 ? (
               resource.capabilities.slice(0, 3).map((c) => (
                 <span
                   key={c.id}
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: "500",
-                    color: "#93c5fd",
-                    background: "rgba(37, 99, 235, 0.15)",
-                    border: "1px solid rgba(59, 130, 246, 0.3)",
-                    padding: "2px 8px",
-                    borderRadius: "5px",
-                  }}
+                  className="text-xs font-semibold text-blue-300 bg-blue-950/60 border border-blue-800/70 px-2.5 py-1 rounded-lg font-mono"
                 >
                   {c.capability.replace(/_/g, " ")}
                 </span>
               ))
             ) : (
-              <span style={{ fontSize: "11.5px", color: "var(--text-muted)", fontStyle: "italic" }}>
+              <span className="text-xs text-slate-500 font-mono italic">
                 Standard Multi-Role Unit
               </span>
             )}
             {resource.capabilities && resource.capabilities.length > 3 && (
-              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+              <span className="text-xs text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md font-mono">
                 +{resource.capabilities.length - 3} more
               </span>
             )}
@@ -309,42 +225,29 @@ export function ResourceCard({
 
         {/* 5. Active Mission Assignment Banner (if deployed) */}
         {activeAssignment && (
-          <div
-            style={{
-              padding: "10px 12px",
-              background: "rgba(245, 158, 11, 0.08)",
-              border: "1px solid rgba(245, 158, 11, 0.3)",
-              borderRadius: "8px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "4px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ fontSize: "10.5px", fontWeight: "700", color: "#f59e0b", letterSpacing: "0.4px", textTransform: "uppercase", display: "flex", alignItems: "center", gap: "5px" }}>
-                <Radio size={11} className="animate-pulse" />
+          <div className="p-4 bg-amber-950/30 border border-amber-800/60 rounded-2xl space-y-1.5 animate-slide-in">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold font-mono text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Radio size={13} className="animate-pulse" />
                 Active Mission
               </div>
               <span
-                style={{
-                  fontSize: "10px",
-                  fontWeight: "700",
-                  padding: "1px 5px",
-                  borderRadius: "4px",
-                  color: activeAssignment.incident.severity === "CRITICAL" ? "#f87171" : "#fbbf24",
-                  background: activeAssignment.incident.severity === "CRITICAL" ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                }}
+                className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded ${
+                  activeAssignment.incident.severity === "CRITICAL"
+                    ? "bg-red-950 text-red-300 border border-red-800"
+                    : "bg-amber-950 text-amber-300 border border-amber-800"
+                }`}
               >
                 {activeAssignment.incident.severity}
               </span>
             </div>
             <Link
               href={`/incidents/${activeAssignment.incident.id}`}
-              style={{ fontSize: "12.5px", fontWeight: "600", color: "var(--text-primary)", textDecoration: "none" }}
+              className="text-sm font-bold text-slate-100 hover:text-blue-400 transition-colors block truncate"
             >
               {activeAssignment.incident.title}
             </Link>
-            <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+            <div className="text-xs text-slate-400 font-mono">
               Assigned {formatRelativeTime(activeAssignment.assignedAt)}
             </div>
           </div>
@@ -352,50 +255,22 @@ export function ResourceCard({
 
         {/* 6. Expandable Equipment & Specs Toggle */}
         {allEquipment.length > 0 && (
-          <div>
+          <div className="space-y-2">
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                fontSize: "11px",
-                color: "var(--text-muted)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                padding: "2px 0",
-              }}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 cursor-pointer font-mono"
             >
-              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               <span>{expanded ? "Hide equipment specs" : `View equipment specs (${allEquipment.length})`}</span>
             </button>
 
             {expanded && (
-              <div
-                style={{
-                  marginTop: "6px",
-                  padding: "8px 10px",
-                  background: "rgba(3, 7, 18, 0.5)",
-                  borderRadius: "6px",
-                  border: "1px solid var(--border-primary)",
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "4px",
-                }}
-              >
+              <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 flex flex-wrap gap-1.5 animate-slide-in">
                 {allEquipment.map((eq, i) => (
                   <span
                     key={i}
-                    style={{
-                      fontSize: "10.5px",
-                      color: "var(--text-secondary)",
-                      background: "rgba(255, 255, 255, 0.04)",
-                      border: "1px solid var(--border-primary)",
-                      padding: "1px 6px",
-                      borderRadius: "4px",
-                    }}
+                    className="text-xs text-slate-300 bg-slate-900 border border-slate-700/80 px-2.5 py-0.5 rounded-lg font-mono"
                   >
                     {eq}
                   </span>
@@ -407,49 +282,21 @@ export function ResourceCard({
 
         {/* Action Error Banner */}
         {actionError && (
-          <div
-            style={{
-              padding: "6px 10px",
-              background: "rgba(239, 68, 68, 0.15)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: "6px",
-              fontSize: "11px",
-              color: "#f87171",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <AlertCircle size={13} style={{ flexShrink: 0 }} />
+          <div className="p-3 bg-red-950/80 border border-red-800 rounded-xl text-xs text-red-300 flex items-center gap-2">
+            <AlertCircle size={15} className="flex-shrink-0 text-red-400" />
             <span>{actionError}</span>
           </div>
         )}
       </div>
 
       {/* 7. Bottom Action Bar */}
-      <div
-        style={{
-          paddingTop: "12px",
-          borderTop: "1px solid var(--border-primary)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "8px",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+      <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {resource.status !== "AVAILABLE" && (
             <button
               onClick={() => handleAction("AVAILABLE")}
               disabled={isUpdating}
-              className="btn btn-secondary"
-              style={{
-                fontSize: "11.5px",
-                padding: "3px 8px",
-                color: "#4ade80",
-                borderColor: "rgba(34, 197, 94, 0.3)",
-              }}
+              className="btn btn-secondary text-xs px-3 py-1.5 text-emerald-400 hover:text-emerald-300 border-emerald-800/80 hover:bg-emerald-950/40 rounded-xl"
             >
               Set Available
             </button>
@@ -458,13 +305,7 @@ export function ResourceCard({
             <button
               onClick={() => handleAction("ON_SCENE")}
               disabled={isUpdating}
-              className="btn btn-secondary"
-              style={{
-                fontSize: "11.5px",
-                padding: "3px 8px",
-                color: "#c084fc",
-                borderColor: "rgba(168, 85, 247, 0.3)",
-              }}
+              className="btn btn-secondary text-xs px-3 py-1.5 text-purple-400 hover:text-purple-300 border-purple-800/80 hover:bg-purple-950/40 rounded-xl"
             >
               On Scene
             </button>
@@ -473,13 +314,7 @@ export function ResourceCard({
             <button
               onClick={() => handleAction("RETURNING")}
               disabled={isUpdating}
-              className="btn btn-secondary"
-              style={{
-                fontSize: "11.5px",
-                padding: "3px 8px",
-                color: "#22d3ee",
-                borderColor: "rgba(6, 182, 212, 0.3)",
-              }}
+              className="btn btn-secondary text-xs px-3 py-1.5 text-cyan-400 hover:text-cyan-300 border-cyan-800/80 hover:bg-cyan-950/40 rounded-xl"
             >
               Returning
             </button>
@@ -488,12 +323,7 @@ export function ResourceCard({
             <button
               onClick={() => handleAction("STANDBY")}
               disabled={isUpdating}
-              className="btn btn-secondary"
-              style={{
-                fontSize: "11.5px",
-                padding: "3px 8px",
-                color: "var(--text-muted)",
-              }}
+              className="btn btn-secondary text-xs px-3 py-1.5 text-slate-400 hover:text-slate-300 rounded-xl"
             >
               Standby
             </button>
@@ -502,13 +332,7 @@ export function ResourceCard({
             <button
               onClick={() => handleAction("OUT_OF_SERVICE")}
               disabled={isUpdating}
-              className="btn btn-secondary"
-              style={{
-                fontSize: "11.5px",
-                padding: "3px 8px",
-                color: "#f87171",
-                borderColor: "rgba(239, 68, 68, 0.3)",
-              }}
+              className="btn btn-secondary text-xs px-3 py-1.5 text-red-400 hover:text-red-300 border-red-800/80 hover:bg-red-950/40 rounded-xl"
             >
               OOS
             </button>
@@ -518,11 +342,10 @@ export function ResourceCard({
         <button
           onClick={() => onOpenStatusModal(resource)}
           disabled={isUpdating}
-          className="btn btn-secondary"
-          style={{ fontSize: "11.5px", padding: "4px 10px", display: "flex", alignItems: "center", gap: "4px" }}
+          className="btn btn-secondary text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 font-medium ml-auto"
           title="Open advanced resource management"
         >
-          <Sliders size={12} />
+          <Sliders size={13} />
           <span>Manage</span>
         </button>
       </div>

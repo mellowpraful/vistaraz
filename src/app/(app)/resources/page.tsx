@@ -246,7 +246,7 @@ export default function ResourcesPage() {
   ]);
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div className="max-w-7xl mx-auto space-y-8 sm:space-y-9 animate-fade-in pb-24">
       {/* Top Header */}
       <PageHeader
         title="Emergency Fleet & Resource Registry"
@@ -254,7 +254,7 @@ export default function ResourcesPage() {
         icon={Shield}
         iconColor="#3b82f6"
         badge={
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-md text-xs font-mono text-slate-300">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span>Telemetry Feed Live</span>
           </div>
@@ -263,10 +263,9 @@ export default function ResourcesPage() {
           <button
             onClick={() => fetchResources(true)}
             disabled={isRefreshing || loading}
-            className="btn btn-secondary text-xs flex items-center gap-1.5"
-            style={{ padding: "8px 14px", fontSize: "12px" }}
+            className="btn btn-secondary text-xs sm:text-sm flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold shadow-sm cursor-pointer"
           >
-            <RotateCcw size={14} className={isRefreshing ? "animate-spin text-blue-400" : ""} />
+            <RotateCcw size={15} className={isRefreshing ? "animate-spin text-blue-400" : ""} />
             <span>{isRefreshing ? "Refreshing…" : "Refresh Telemetry"}</span>
           </button>
         }
@@ -275,23 +274,23 @@ export default function ResourcesPage() {
       {/* Feedback / Notification Banner */}
       {feedbackMessage && (
         <div
-          className={`p-3 rounded-lg border text-xs flex items-center justify-between gap-2 animate-slide-in ${
+          className={`p-4 rounded-2xl border text-xs sm:text-sm flex items-center justify-between gap-3 animate-slide-in shadow-lg ${
             feedbackMessage.type === "success"
-              ? "bg-emerald-950/80 border-emerald-800 text-emerald-200"
-              : "bg-red-950/80 border-red-800 text-red-200"
+              ? "bg-emerald-950/90 border-emerald-800 text-emerald-200"
+              : "bg-red-950/90 border-red-800 text-red-200"
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {feedbackMessage.type === "success" ? (
-              <CheckCircle size={16} className="text-emerald-400" />
+              <CheckCircle size={18} className="text-emerald-400 shrink-0" />
             ) : (
-              <AlertTriangle size={16} className="text-red-400" />
+              <AlertTriangle size={18} className="text-red-400 shrink-0" />
             )}
-            <span>{feedbackMessage.text}</span>
+            <span className="font-medium">{feedbackMessage.text}</span>
           </div>
           <button
             onClick={() => setFeedbackMessage(null)}
-            className="text-slate-400 hover:text-slate-200 font-mono text-[10px]"
+            className="text-slate-400 hover:text-slate-200 font-mono text-xs px-2 py-1 rounded hover:bg-slate-800/60 transition-colors"
           >
             DISMISS
           </button>
@@ -300,14 +299,14 @@ export default function ResourcesPage() {
 
       {/* Fetch Error Banner */}
       {fetchError && (
-        <div className="p-3 bg-red-950/80 border border-red-800 rounded-lg text-xs text-red-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} className="text-red-400" />
+        <div className="p-4 bg-red-950/90 border border-red-800 rounded-2xl text-xs sm:text-sm text-red-200 flex items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle size={18} className="text-red-400 shrink-0" />
             <span>Telemetry connection issue: {fetchError}</span>
           </div>
           <button
             onClick={() => fetchResources(true)}
-            className="text-xs bg-red-900 hover:bg-red-800 text-white px-2.5 py-1 rounded"
+            className="text-xs font-mono bg-red-900 hover:bg-red-800 text-white px-3 py-1.5 rounded-xl transition-colors font-semibold"
           >
             Retry
           </button>
@@ -346,11 +345,11 @@ export default function ResourcesPage() {
 
       {/* Main Content Area */}
       {loading ? (
-        <div className="card p-12 text-center text-slate-400 space-y-3 flex flex-col items-center justify-center">
+        <div className="card p-16 text-center text-slate-400 space-y-4 flex flex-col items-center justify-center rounded-3xl shadow-xl">
           <LoadingState label="Syncing live fleet telemetry & capability matrix..." />
         </div>
       ) : filteredResources.length === 0 ? (
-        <div className="card p-12 text-center border-slate-800 bg-slate-900/40">
+        <div className="card p-16 text-center border-slate-800 bg-slate-900/40 rounded-3xl shadow-xl">
           <EmptyState
             icon={Shield}
             title="No Matching Resources Found"
@@ -362,7 +361,7 @@ export default function ResourcesPage() {
           />
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-7">
           {filteredResources.map((resource) => (
             <ResourceCard
               key={resource.id}

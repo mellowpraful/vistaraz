@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useTheme } from "@/context/ThemeContext";
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -28,6 +29,8 @@ import {
   Flame,
   PlusCircle,
   History,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 const NAV_GROUPS = [
@@ -86,6 +89,7 @@ const ROLE_COLORS: Record<Role, { text: string; bg: string; border: string }> = 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState<Role>("OPERATOR");
   const [collapsed, setCollapsed] = useState(false);
@@ -98,6 +102,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setCurrentTime(new Date());
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Keyboard shortcut Ctrl+B or Cmd+B to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setCollapsed((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -446,21 +462,132 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             )}
 
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <button
+                onClick={() => { localStorage.clear(); router.push("/"); }}
+                style={{
+                  flex: 1,
+                  padding: "7px 10px",
+                  background: "transparent",
+                  border: "1px solid var(--border-primary)",
+                  borderRadius: "6px",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  fontSize: "11px",
+                  fontWeight: "600",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#7f1d1d";
+                  (e.currentTarget as HTMLButtonElement).style.color = "#f87171";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-primary)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+                }}
+              >
+                <LogOut size={12} />
+                Sign Out
+              </button>
+
+              <button
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
+                style={{
+                  padding: "7px 10px",
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-primary)",
+                  borderRadius: "6px",
+                  color: "var(--text-primary)",
+                  cursor: "pointer",
+                  fontSize: "11px",
+                  fontWeight: "600",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "5px",
+                  transition: "all 0.15s",
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-secondary)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-primary)";
+                }}
+              >
+                {theme === "dark" ? (
+                  <>
+                    <Sun size={12} color="#f59e0b" />
+                    <span>Light</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon size={12} color="#3b82f6" />
+                    <span>Dark</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Collapsed Rail Footer */}
+        {collapsed && (
+          <div
+            style={{
+              borderTop: "1px solid var(--border-primary)",
+              padding: "10px 8px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              alignItems: "center",
+              flexShrink: 0,
+            }}
+          >
             <button
-              onClick={() => { localStorage.clear(); router.push("/"); }}
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
               style={{
-                width: "100%",
-                padding: "6px",
-                background: "transparent",
-                border: "1px solid var(--border-primary)",
+                width: "36px",
+                height: "36px",
                 borderRadius: "6px",
-                color: "var(--text-muted)",
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-primary)",
+                color: "var(--text-primary)",
                 cursor: "pointer",
-                fontSize: "11px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "6px",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-secondary)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-primary)";
+              }}
+            >
+              {theme === "dark" ? <Sun size={15} color="#f59e0b" /> : <Moon size={15} color="#3b82f6" />}
+            </button>
+            <button
+              onClick={() => { localStorage.clear(); router.push("/"); }}
+              title="Sign Out"
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "6px",
+                background: "transparent",
+                border: "1px solid var(--border-primary)",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 transition: "all 0.15s",
               }}
               onMouseEnter={(e) => {
@@ -472,8 +599,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
               }}
             >
-              <LogOut size={11} />
-              Sign Out
+              <LogOut size={14} />
             </button>
           </div>
         )}
@@ -499,7 +625,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             transition: "all 0.15s",
             boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
           }}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
         >
           {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
@@ -531,23 +657,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             top: 0,
             zIndex: 50,
             flexShrink: 0,
+            transition: "background-color 0.25s ease, border-color 0.25s ease",
           }}
         >
-          {/* Left: Mobile hamburger & breadcrumb */}
+          {/* Left: Hamburger & breadcrumb */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              className="mobile-nav-toggle"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.innerWidth <= 768) {
+                  setMobileOpen(!mobileOpen);
+                } else {
+                  setCollapsed(!collapsed);
+                }
+              }}
               style={{
-                background: "transparent",
+                background: "var(--bg-elevated)",
                 border: "1px solid var(--border-primary)",
                 borderRadius: "6px",
-                padding: "6px",
+                padding: "6px 8px",
                 color: "var(--text-primary)",
                 cursor: "pointer",
+                display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
+                transition: "all 0.15s",
               }}
+              title={collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
               aria-label="Toggle navigation menu"
             >
               {mobileOpen ? <X size={16} /> : <Menu size={16} />}
@@ -573,8 +708,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </span>
           </div>
 
-          {/* Right: status indicators */}
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {/* Right: status indicators & controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             {/* System status */}
             <div
               style={{
@@ -606,15 +741,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Region */}
             <div
+              className="hidden sm:block"
               style={{
                 fontSize: "11px",
                 color: "var(--text-secondary)",
                 fontWeight: "600",
                 letterSpacing: "0.2px",
                 padding: "3px 8px",
-                background: "rgba(255, 255, 255, 0.04)",
+                background: "var(--bg-elevated)",
                 borderRadius: "4px",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
+                border: "1px solid var(--border-primary)",
               }}
             >
               GUJARAT METRO EOC
@@ -623,6 +759,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Clock */}
             <div
               suppressHydrationWarning
+              className="hidden md:flex"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -655,6 +792,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               {userRole}
             </div>
+
+            {/* Top Bar Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
+              style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "6px",
+                background: "var(--bg-card)",
+                border: "1px solid var(--border-primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "var(--text-primary)",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-secondary)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-primary)";
+              }}
+            >
+              {theme === "dark" ? <Sun size={14} color="#f59e0b" /> : <Moon size={14} color="#3b82f6" />}
+            </button>
 
             {/* Notifications placeholder */}
             <div

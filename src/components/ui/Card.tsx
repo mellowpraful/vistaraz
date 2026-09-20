@@ -9,34 +9,33 @@ interface CardProps {
   onClick?: () => void;
 }
 
-export function Card({ children, style, hover = false, accent, onClick }: CardProps) {
+export function Card({ children, className, style, hover = false, accent, onClick }: CardProps) {
   const [hovered, setHovered] = React.useState(false);
   return (
     <div
       onClick={onClick}
       onMouseEnter={() => hover && setHovered(true)}
       onMouseLeave={() => hover && setHovered(false)}
+      className={`card ${className || ""}`}
       style={{
-        background: hovered
-          ? "linear-gradient(145deg, rgba(21, 31, 50, 0.95) 0%, rgba(15, 22, 35, 0.95) 100%)"
-          : "linear-gradient(145deg, rgba(15, 22, 35, 0.85) 0%, rgba(10, 14, 23, 0.85) 100%)",
+        background: hovered ? "var(--bg-card-hover)" : "var(--bg-card)",
         borderStyle: "solid",
         borderTopWidth: "1px",
         borderRightWidth: "1px",
         borderBottomWidth: "1px",
         borderLeftWidth: accent ? "3px" : "1px",
-        borderTopColor: hovered ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.07)",
-        borderRightColor: hovered ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.07)",
-        borderBottomColor: hovered ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.07)",
+        borderTopColor: hovered ? "var(--border-secondary)" : "var(--border-primary)",
+        borderRightColor: hovered ? "var(--border-secondary)" : "var(--border-primary)",
+        borderBottomColor: hovered ? "var(--border-secondary)" : "var(--border-primary)",
         borderLeftColor: accent
           ? accent
-          : (hovered ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.07)"),
+          : (hovered ? "var(--border-secondary)" : "var(--border-primary)"),
         borderRadius: "10px",
-        transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        transition: "all 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
         cursor: onClick ? "pointer" : undefined,
         boxShadow: hovered
-          ? "0 12px 32px -4px rgba(0, 0, 0, 0.5), 0 0 15px rgba(59, 130, 246, 0.1)"
-          : "0 4px 20px rgba(0, 0, 0, 0.25)",
+          ? "0 10px 30px -4px rgba(0, 0, 0, 0.15), 0 0 15px rgba(37, 99, 235, 0.08)"
+          : "0 4px 18px rgba(0, 0, 0, 0.06)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
         ...style,
