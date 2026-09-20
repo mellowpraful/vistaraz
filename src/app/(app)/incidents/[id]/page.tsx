@@ -4,6 +4,7 @@ import { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils";
 import { INCIDENT_TYPE_ICONS, SEVERITY_DOT } from "@/lib/types";
+import MapWrapper from "@/components/map/MapWrapper";
 
 interface IncidentDetail {
   id: string;
@@ -422,6 +423,44 @@ export default function IncidentDetailPage({
             </div>
           </div>
 
+          {/* Location & Interactive Map Card */}
+          <div className="card p-5 space-y-3 flex flex-col h-[400px]">
+            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span>📍</span> Incident Location
+              </span>
+              <span className="text-[10px] text-slate-500 font-mono font-normal">
+                {incident.latitude?.toFixed(4) || "N/A"}, {incident.longitude?.toFixed(4) || "N/A"}
+              </span>
+            </h3>
+            
+            <div className="flex-1 rounded-lg overflow-hidden border border-slate-800 relative bg-slate-950">
+              {incident.latitude && incident.longitude ? (
+                <div className="absolute inset-0 z-0">
+                  <MapWrapper
+                    latitude={incident.latitude}
+                    longitude={incident.longitude}
+                    readOnly={true}
+                  />
+                </div>
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-slate-500 text-xs italic">
+                  Location unavailable
+                </div>
+              )}
+            </div>
+            
+            <div className="pt-2 text-xs text-slate-400 flex items-center justify-between font-mono">
+              <span className="truncate max-w-[200px]">{incident.locationName || "No specific address"}</span>
+              <Link
+                href={`/map?lat=${incident.latitude || 23.0225}&lng=${incident.longitude || 72.5714}`}
+                className="text-blue-400 hover:text-blue-300 transition"
+              >
+                Open Full Map →
+              </Link>
+            </div>
+          </div>
+
           {/* AI Recommended Dispatches */}
           <div className="card p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -630,33 +669,6 @@ export default function IncidentDetailPage({
                 </Link>
               </div>
             )}
-          </div>
-
-          {/* Location & Map Coordinates Card */}
-          <div className="card p-5 space-y-3">
-            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <span>📍</span> Geolocation Telemetry
-            </h3>
-            <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2 font-mono text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Landmark:</span>
-                <span className="text-slate-300 truncate max-w-[150px]">{incident.locationName || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Latitude:</span>
-                <span className="text-slate-300">{incident.latitude?.toFixed(6) || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Longitude:</span>
-                <span className="text-slate-300">{incident.longitude?.toFixed(6) || "N/A"}</span>
-              </div>
-            </div>
-            <Link
-              href={`/map?lat=${incident.latitude || 23.0225}&lng=${incident.longitude || 72.5714}`}
-              className="btn-secondary text-xs w-full text-center block py-2"
-            >
-              Open Full Incident Map View →
-            </Link>
           </div>
 
           {/* Original 911 Call / Report Transcript if present */}
