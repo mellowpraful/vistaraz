@@ -52,8 +52,33 @@ export default function MyIncidentsPage() {
     const activeSosId = localStorage.getItem("crisisos_active_sos");
 
     if (localItems.length === 0 && !activeSosId) {
-      setIncidents([]);
-      setLoading(false);
+      try {
+        setRefreshing(true);
+        const res = await fetch("/api/incidents?limit=15");
+        if (res.ok) {
+          const json = await res.json();
+          const apiIncidents = json.data || json.incidents || [];
+          const formatted: MyIncidentItem[] = apiIncidents.map((i: any) => ({
+            id: i.id,
+            title: i.title,
+            type: i.type,
+            severity: i.severity,
+            status: i.status || "REPORTED",
+            locationName: i.locationName,
+            createdAt: i.createdAt || new Date().toISOString(),
+          }));
+          setIncidents(formatted);
+          if (formatted.length > 0) {
+            localStorage.setItem("crisisos_my_incidents", JSON.stringify(formatted));
+          }
+        }
+      } catch (fetchErr) {
+        console.warn("API fallback fetch error:", fetchErr);
+        setIncidents([]);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
       return;
     }
 

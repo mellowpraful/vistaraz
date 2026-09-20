@@ -79,7 +79,7 @@ export const CreateIncidentSchema = z.object({
   locationName: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
-  affectedCount: z.number().int().positive().optional(),
+  affectedCount: z.number().int().min(0).optional(),
   injuryCount: z.number().int().min(0).optional(),
   hazards: z.array(z.string()).optional(),
   requiredCapabilities: z.array(z.string()).optional(),

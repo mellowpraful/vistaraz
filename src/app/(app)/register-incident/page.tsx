@@ -69,15 +69,74 @@ export default function RegisterIncidentPage() {
 
   const [locating, setLocating] = useState(false);
   const [locDetected, setLocDetected] = useState(false);
+  const [reverseGeocoding, setReverseGeocoding] = useState(false);
+  const [addressSearchQuery, setAddressSearchQuery] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [searchingAddress, setSearchingAddress] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [createdIncident, setCreatedIncident] = useState<any | null>(null);
 
+  // Address search autocomplete (Nominatim API)
+  useEffect(() => {
+    if (!addressSearchQuery.trim() || addressSearchQuery.length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearchingAddress(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressSearchQuery)}&limit=5&addressdetails=1`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setAddressSuggestions(data || []);
+          setShowSuggestions(true);
+        }
+      } catch (err) {
+        console.warn("Address search failed:", err);
+      } finally {
+        setSearchingAddress(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [addressSearchQuery]);
+
+  // Reverse geocode coordinates to real address name
+  const reverseGeocode = async (lat: number, lng: number) => {
+    setReverseGeocoding(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.display_name) {
+          setFormData((prev) => ({
+            ...prev,
+            locationName: data.display_name,
+            latitude: lat,
+            longitude: lng,
+          }));
+          setAddressSearchQuery(data.display_name);
+        }
+      }
+    } catch (err) {
+      console.warn("Reverse geocode failed:", err);
+    } finally {
+      setReverseGeocoding(false);
+    }
+  };
+
   // Auto detect location on click
   const handleDetectLocation = () => {
     if (typeof window === "undefined" || !navigator.geolocation) {
-      setErrorMsg("Geolocation is not supported by your browser.");
+      setErrorMsg("Geolocation is not supported by your browser. Please select location on the map or search address.");
       return;
     }
     setLocating(true);
@@ -90,18 +149,39 @@ export default function RegisterIncidentPage() {
           ...prev,
           latitude: lat,
           longitude: lng,
-          locationName: prev.locationName || `GPS: ${lat}, ${lng}`,
         }));
         setLocDetected(true);
         setLocating(false);
+        reverseGeocode(lat, lng);
       },
       (err) => {
         console.warn("GPS error:", err.message);
-        setErrorMsg("Unable to retrieve GPS. You can type the location name manually.");
+        setErrorMsg("Unable to retrieve GPS position. Please enter address or tap on the map.");
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
+  };
+
+  // Handle selecting address from suggestion
+  const handleSelectAddressSuggestion = (item: any) => {
+    const lat = parseFloat(parseFloat(item.lat).toFixed(6));
+    const lng = parseFloat(parseFloat(item.lon).toFixed(6));
+    setFormData((prev) => ({
+      ...prev,
+      locationName: item.display_name,
+      latitude: lat,
+      longitude: lng,
+    }));
+    setAddressSearchQuery(item.display_name);
+    setShowSuggestions(false);
+    setLocDetected(true);
+  };
+
+  // Map pin tap callback
+  const handleMapLocationChange = (lat: number, lng: number) => {
+    setFormData((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+    reverseGeocode(lat, lng);
   };
 
   const handleHazardToggle = (hazard: string) => {
@@ -125,7 +205,11 @@ export default function RegisterIncidentPage() {
       errs.locationName = "Location name or landmark is required";
     }
     setFieldErrors(errs);
-    return Object.keys(errs).length === 0;
+    if (Object.keys(errs).length > 0) {
+      setErrorMsg("Validation required: " + Object.values(errs).join(". "));
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,11 +228,11 @@ export default function RegisterIncidentPage() {
       severity: formData.severity,
       description: `${formData.description.trim()}${reporterNote}`,
       source: "CITIZEN_REPORT",
-      locationName: formData.locationName.trim(),
+      locationName: formData.locationName.trim() || `Coordinates: ${formData.latitude}, ${formData.longitude}`,
       latitude: formData.latitude || 23.0225,
       longitude: formData.longitude || 72.5714,
       affectedCount: formData.affectedCount > 0 ? formData.affectedCount : undefined,
-      injuryCount: formData.injuryCount > 0 ? formData.injuryCount : undefined,
+      injuryCount: formData.injuryCount >= 0 ? formData.injuryCount : undefined,
       hazards: formData.hazards,
       originalReport: `Manual Incident Registration at ${formData.dateTime}. Details: ${formData.description}. Contact: ${formData.reporterPhone || "N/A"}`,
     };
@@ -490,65 +574,150 @@ export default function RegisterIncidentPage() {
 
         {/* 2. Geolocation & Timestamp Card */}
         <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-primary)", borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
             <h3 style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "1px", margin: 0 }}>
               2. Location & Time Details
             </h3>
             <button
               type="button"
               onClick={handleDetectLocation}
-              disabled={locating}
+              disabled={locating || reverseGeocoding}
               style={{
                 background: "rgba(37,99,235,0.1)",
                 border: "1px solid rgba(37,99,235,0.3)",
                 borderRadius: "6px",
                 color: "#60a5fa",
-                padding: "4px 10px",
+                padding: "6px 12px",
                 fontSize: "11px",
                 fontWeight: "600",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: "4px",
+                gap: "6px",
               }}
             >
-              <MapPin size={12} />
-              {locating ? "Detecting GPS..." : locDetected ? "GPS Active" : "Detect Current GPS"}
+              <MapPin size={13} />
+              {locating ? "Detecting GPS..." : reverseGeocoding ? "Geocoding Address..." : locDetected ? "GPS Location Active" : "Detect Current GPS"}
             </button>
           </div>
 
-          <div>
+          {/* Location Autocomplete Search */}
+          <div style={{ position: "relative" }}>
             <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-primary)", display: "block", marginBottom: "6px" }}>
-              Location Name / Landmark / Address <span style={{ color: "#ef4444" }}>*</span>
+              Search Address or Enter Location Landmark <span style={{ color: "#ef4444" }}>*</span>
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Near Usmanpura AMTS Bus Stop, Ashram Road"
-              value={formData.locationName}
-              onChange={(e) => setFormData({ ...formData, locationName: e.target.value })}
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                background: "var(--bg-secondary)",
-                border: `1px solid ${fieldErrors.locationName ? "#ef4444" : "var(--border-secondary)"}`,
-                borderRadius: "6px",
-                color: "var(--text-primary)",
-                fontSize: "13px",
-                outline: "none",
-              }}
-            />
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                type="text"
+                placeholder="Search real address (e.g. Ashram Road, Ahmedabad, Gujarat)..."
+                value={formData.locationName}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData((prev) => ({ ...prev, locationName: val }));
+                  setAddressSearchQuery(val);
+                }}
+                onFocus={() => addressSuggestions.length > 0 && setShowSuggestions(true)}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  background: "var(--bg-secondary)",
+                  border: `1px solid ${fieldErrors.locationName ? "#ef4444" : "var(--border-secondary)"}`,
+                  borderRadius: "6px",
+                  color: "var(--text-primary)",
+                  fontSize: "13px",
+                  outline: "none",
+                }}
+              />
+            </div>
             {fieldErrors.locationName && <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>{fieldErrors.locationName}</div>}
+
+            {/* Address Autocomplete Suggestions Dropdown */}
+            {showSuggestions && addressSuggestions.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  zIndex: 50,
+                  marginTop: "4px",
+                  background: "#0f172a",
+                  border: "1px solid #334155",
+                  borderRadius: "8px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.8)",
+                  overflow: "hidden",
+                }}
+              >
+                {addressSuggestions.map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSelectAddressSuggestion(item)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      textAlign: "left",
+                      background: "transparent",
+                      border: "none",
+                      borderBottom: idx < addressSuggestions.length - 1 ? "1px solid #1e293b" : "none",
+                      color: "#e2e8f0",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "8px",
+                    }}
+                    className="hover:bg-slate-800 transition-colors"
+                  >
+                    <MapPin size={14} className="text-blue-400 shrink-0 mt-0.5" />
+                    <div>
+                      <div style={{ fontWeight: "600", color: "#f8fafc" }}>{item.display_name}</div>
+                      <div style={{ fontSize: "10px", color: "#94a3b8", fontFamily: "monospace" }}>
+                        Lat: {parseFloat(item.lat).toFixed(4)}, Lng: {parseFloat(item.lon).toFixed(4)}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Location Confirmation Badge */}
+          {formData.locationName && (
+            <div
+              style={{
+                padding: "10px 14px",
+                background: "rgba(34,197,94,0.08)",
+                border: "1px solid rgba(34,197,94,0.3)",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "10px",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <CheckCircle2 size={16} color="#22c55e" className="shrink-0" />
+                <span style={{ fontSize: "12px", color: "#4ade80", fontWeight: "600" }}>
+                  Location Confirmed: {formData.locationName}
+                </span>
+              </div>
+              <span style={{ fontSize: "11px", fontFamily: "monospace", color: "#a7f3d0", background: "rgba(6,78,59,0.5)", padding: "2px 8px", borderRadius: "4px" }}>
+                {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
+              </span>
+            </div>
+          )}
 
           <div>
             <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-primary)", display: "block", marginBottom: "6px" }}>
-              Pinpoint Location on Map
+              Pinpoint Location on Map (Click anywhere to update coordinates)
             </label>
             <div style={{ height: "300px", width: "100%", marginBottom: "12px" }}>
               <MapWrapper 
                 latitude={formData.latitude} 
                 longitude={formData.longitude} 
-                onChange={(lat, lng) => setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }))}
+                onChange={handleMapLocationChange}
               />
             </div>
           </div>
@@ -755,6 +924,13 @@ export default function RegisterIncidentPage() {
         </div>
 
         {/* Submit Buttons */}
+        {errorMsg && (
+          <div style={{ padding: "12px 16px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", borderRadius: "8px", color: "#fca5a5", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>⚠️</span>
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "12px" }}>
           <Link
             href="/my-incidents"
@@ -776,28 +952,29 @@ export default function RegisterIncidentPage() {
             disabled={submitting}
             style={{
               padding: "12px 28px",
-              background: "var(--accent-blue)",
+              background: submitting ? "var(--bg-secondary)" : "var(--accent-blue)",
               border: "none",
               borderRadius: "8px",
               color: "#fff",
               fontSize: "14px",
               fontWeight: "700",
-              cursor: "pointer",
+              cursor: submitting ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              boxShadow: "0 0 15px rgba(37,99,235,0.4)",
+              boxShadow: submitting ? "none" : "0 0 15px rgba(37,99,235,0.4)",
+              opacity: submitting ? 0.7 : 1,
             }}
           >
             {submitting ? (
               <>
-                <RefreshCw size={16} className="animate-spin" />
-                Registering Incident...
+                <RefreshCw size={16} className="animate-spin text-blue-400" />
+                <span>Submitting Incident Report...</span>
               </>
             ) : (
               <>
                 <Send size={16} />
-                Submit Incident Report
+                <span>Submit Incident Report</span>
               </>
             )}
           </button>

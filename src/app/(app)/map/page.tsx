@@ -120,7 +120,6 @@ function MapViewContent() {
             <span className="badge badge-success flex items-center gap-1">
               <Radio size={11} className="animate-pulse" /> Live Telemetry
             </span>
-            <span className="badge badge-neutral">CartoDB Dark Vector</span>
           </div>
         }
         actions={

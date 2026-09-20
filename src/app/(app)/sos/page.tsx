@@ -22,6 +22,8 @@ import {
   ChevronRight,
   Send,
   Volume2,
+  Search,
+  Map,
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import MapWrapper from "@/components/map/MapWrapper";
@@ -118,6 +120,10 @@ export default function EmergencySOSPage() {
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
+  const [locationStatus, setLocationStatus] = useState<"DETECTING" | "FOUND" | "FAILED" | "MANUAL">("DETECTING");
+  const [addressSearch, setAddressSearch] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [searchingAddress, setSearchingAddress] = useState(false);
   const [activeIncident, setActiveIncident] = useState<ActiveIncident | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -127,10 +133,12 @@ export default function EmergencySOSPage() {
   const detectLocation = useCallback(() => {
     if (typeof window === "undefined" || !navigator.geolocation) {
       setLocError("Geolocation not supported by device/browser.");
+      setLocationStatus("FAILED");
       return;
     }
     setLocating(true);
     setLocError(null);
+    setLocationStatus("DETECTING");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const lat = pos.coords.latitude;
@@ -139,17 +147,44 @@ export default function EmergencySOSPage() {
         setAccuracy(Math.round(pos.coords.accuracy));
         setLocationName(`GPS: ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E (±${Math.round(pos.coords.accuracy)}m)`);
         setLocating(false);
+        setLocationStatus("FOUND");
       },
       (err) => {
         console.warn("Geolocation prompt skipped or denied:", err.message);
-        setLocError("Location access unavailable. Using default EOC zone.");
-        // Fallback default coordinates (Ahmedabad Center)
-        setCoords({ lat: 23.0225, lng: 72.5714 });
+        setLocError("Unable to detect your location.");
         setLocating(false);
+        setLocationStatus("FAILED");
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
     );
   }, []);
+
+  const handleAddressSearch = async (query: string) => {
+    setAddressSearch(query);
+    if (query.trim().length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+    setSearchingAddress(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
+      const data = await res.json();
+      setAddressSuggestions(data);
+    } catch (err) {
+      console.error("Address search error:", err);
+    } finally {
+      setSearchingAddress(false);
+    }
+  };
+
+  const handleSelectAddress = (suggestion: any) => {
+    const lat = parseFloat(suggestion.lat);
+    const lng = parseFloat(suggestion.lon);
+    setCoords({ lat, lng });
+    setLocationName(suggestion.display_name);
+    setAddressSearch(suggestion.display_name);
+    setAddressSuggestions([]);
+  };
 
   // Check for existing active SOS from localStorage
   useEffect(() => {
@@ -805,58 +840,214 @@ export default function EmergencySOSPage() {
                 </button>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
+              {locationStatus === "DETECTING" && (
+                <div style={{
+                  padding: "30px",
                   background: "var(--bg-secondary)",
-                  border: "1px solid var(--border-secondary)",
                   borderRadius: "8px",
-                  padding: "10px 14px",
-                }}
-              >
-                <MapPin size={18} color="#22c55e" style={{ flexShrink: 0 }} />
-                <input
-                  type="text"
-                  value={locationName}
-                  onChange={(e) => setLocationName(e.target.value)}
-                  placeholder="Enter landmark, road, or city..."
-                  style={{
-                    flex: 1,
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--text-primary)",
-                    fontSize: "13px",
-                    outline: "none",
-                  }}
-                />
-                {coords && (
-                  <span
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "12px",
+                  border: "1px dashed var(--border-secondary)"
+                }}>
+                  <RefreshCw size={24} className="animate-spin" color="var(--accent-blue-bright)" />
+                  <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>Detecting your location...</span>
+                </div>
+              )}
+
+              {locationStatus === "FAILED" && (
+                <div style={{
+                  padding: "24px",
+                  background: "rgba(239, 68, 68, 0.05)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(239, 68, 68, 0.2)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "16px",
+                  textAlign: "center"
+                }}>
+                  <div style={{ color: "#ef4444", fontSize: "14px", fontWeight: "600" }}>
+                    ⚠️ Unable to detect your location.
+                  </div>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "12px", margin: 0, maxWidth: "300px" }}>
+                    Please try again or enter your location manually to continue.
+                  </p>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={detectLocation}
+                      style={{
+                        padding: "8px 16px",
+                        background: "var(--bg-secondary)",
+                        border: "1px solid var(--border-secondary)",
+                        borderRadius: "6px",
+                        color: "var(--text-primary)",
+                        fontSize: "12px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      <RefreshCw size={14} /> Try Again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCoords({ lat: 23.0225, lng: 72.5714 });
+                        setLocationStatus("MANUAL");
+                      }}
+                      style={{
+                        padding: "8px 16px",
+                        background: "var(--accent-blue)",
+                        border: "none",
+                        borderRadius: "6px",
+                        color: "#fff",
+                        fontSize: "12px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      <Map size={14} /> Enter Location Manually
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(locationStatus === "FOUND" || locationStatus === "MANUAL") && (
+                <>
+                  {locationStatus === "MANUAL" && (
+                    <div style={{ marginBottom: "12px", position: "relative" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          background: "var(--bg-secondary)",
+                          border: "1px solid var(--border-secondary)",
+                          borderRadius: "8px",
+                          padding: "10px 14px",
+                        }}
+                      >
+                        <Search size={18} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                        <input
+                          type="text"
+                          value={addressSearch}
+                          onChange={(e) => handleAddressSearch(e.target.value)}
+                          placeholder="Search address or landmark..."
+                          style={{
+                            flex: 1,
+                            background: "transparent",
+                            border: "none",
+                            color: "var(--text-primary)",
+                            fontSize: "13px",
+                            outline: "none",
+                          }}
+                        />
+                        {searchingAddress && <RefreshCw size={14} className="animate-spin" color="var(--text-muted)" />}
+                      </div>
+
+                      {addressSuggestions.length > 0 && (
+                        <div style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          marginTop: "4px",
+                          background: "var(--bg-card)",
+                          border: "1px solid var(--border-primary)",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          zIndex: 10,
+                          boxShadow: "0 4px 20px rgba(0,0,0,0.5)"
+                        }}>
+                          {addressSuggestions.map((s, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleSelectAddress(s)}
+                              style={{
+                                width: "100%",
+                                padding: "10px 14px",
+                                background: "transparent",
+                                border: "none",
+                                borderBottom: idx < addressSuggestions.length - 1 ? "1px solid var(--border-secondary)" : "none",
+                                textAlign: "left",
+                                color: "var(--text-primary)",
+                                fontSize: "12px",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {s.display_name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div
                     style={{
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: "11px",
-                      color: "#4ade80",
-                      background: "rgba(34,197,94,0.1)",
-                      padding: "3px 8px",
-                      borderRadius: "4px",
-                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border-secondary)",
+                      borderRadius: "8px",
+                      padding: "10px 14px",
                     }}
                   >
-                    {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
-                  </span>
-                )}
-              </div>
-              
-              <div style={{ marginTop: "12px", height: "300px", width: "100%", borderRadius: "8px", overflow: "hidden" }}>
-                <MapWrapper 
-                  latitude={coords?.lat || 23.0225} 
-                  longitude={coords?.lng || 72.5714} 
-                  onChange={(lat, lng) => setCoords({ lat, lng })}
-                />
-              </div>
+                    <MapPin size={18} color="#22c55e" style={{ flexShrink: 0 }} />
+                    <input
+                      type="text"
+                      value={locationName}
+                      onChange={(e) => setLocationName(e.target.value)}
+                      placeholder="Enter landmark, road, or city..."
+                      style={{
+                        flex: 1,
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--text-primary)",
+                        fontSize: "13px",
+                        outline: "none",
+                      }}
+                    />
+                    {coords && (
+                      <span
+                        style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: "11px",
+                          color: "#4ade80",
+                          background: "rgba(34,197,94,0.1)",
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div style={{ marginTop: "12px", height: "300px", width: "100%", borderRadius: "8px", overflow: "hidden" }}>
+                    <MapWrapper 
+                      latitude={coords?.lat || 23.0225} 
+                      longitude={coords?.lng || 72.5714} 
+                      onChange={(lat, lng) => setCoords({ lat, lng })}
+                    />
+                  </div>
 
-              {locError && <div style={{ fontSize: "11px", color: "#f87171", marginTop: "4px" }}>⚠️ {locError}</div>}
+                  {locError && <div style={{ fontSize: "11px", color: "#f87171", marginTop: "4px" }}>⚠️ {locError}</div>}
+                </>
+              )}
             </div>
 
             {/* Step 3: Optional Contact & Scene Notes */}
