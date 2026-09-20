@@ -172,7 +172,7 @@ function MapViewContent() {
       {/* ── Main Map + Inspector Split ─────────────────────────────── */}
       <div className="flex-1 flex gap-4 min-h-0 relative">
         {/* Map View Area */}
-        <div className="flex-1 h-full rounded-xl overflow-hidden border border-slate-800 shadow-2xl relative">
+        <div className="flex-1 h-full min-h-[500px] rounded-xl overflow-hidden border border-slate-800 shadow-2xl relative">
           <SituationMap
             incidents={incidents}
             resources={resources}

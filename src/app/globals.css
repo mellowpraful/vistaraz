@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap');
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 :root {
   /* Ultra-High-Fidelity Cyber Defense Operations Tokens */
@@ -397,6 +398,11 @@ body {
   height: 100% !important;
   background-color: #030712 !important;
   font-family: inherit;
+}
+
+/* Dark tactical tile filter — inverts OSM light tiles to a near-black dark map */
+.map-tiles-dark img {
+  filter: invert(100%) hue-rotate(180deg) brightness(0.75) contrast(1.15) saturate(0.5);
 }
 
 .leaflet-popup-content-wrapper {

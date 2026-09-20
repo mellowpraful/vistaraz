@@ -236,17 +236,17 @@ export default function SituationMap({
       center={[validLat, validLng]}
       zoom={validZoom}
       scrollWheelZoom={true}
-      className="h-full w-full rounded-xl z-0"
+      className="h-full w-full min-h-[500px] rounded-xl z-0"
       style={{ background: "#0b0f19", height: "100%", width: "100%" }}
     >
       <MapUpdater center={[validLat, validLng]} zoom={validZoom} />
 
-      {/* CartoDB Dark Matter High-Contrast EOC Tiles */}
+      {/* Free OSM tiles with CSS dark filter — no API key needed */}
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        subdomains="abcd"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={19}
+        className="map-tiles-dark"
       />
 
       {/* Flood / Hazard Simulation Circles */}
