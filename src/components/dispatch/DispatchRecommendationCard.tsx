@@ -136,7 +136,6 @@ export function DispatchRecommendationCard({
 
   const scoreBreakdown = constraintsObj.scoreBreakdown;
   const telemetry = getTelemetryFreshness(resource.lastUpdated);
-  const typeIcon = RESOURCE_TYPE_ICONS[resource.type] || "🛡️";
   const scorePercent = Math.min(100, Math.round(recommendation.score));
 
   // Equipment aggregation
@@ -159,15 +158,15 @@ export function DispatchRecommendationCard({
       {/* Top Banner & Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className="text-2xl p-2 rounded-xl bg-slate-800/90 border border-slate-700/60 leading-none flex-shrink-0">
-            {typeIcon}
+          <div className="p-2.5 rounded-xl bg-blue-950/60 border border-blue-800/60 flex items-center justify-center flex-shrink-0 text-blue-400">
+            <Shield size={20} />
           </div>
 
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               {isTopPick && (
                 <span className="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
-                  ★ Primary Recommendation
+                  Primary Recommendation
                 </span>
               )}
               <span className="text-[10px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">

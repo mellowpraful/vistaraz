@@ -1,34 +1,68 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Building2, Tent, RotateCcw, BedDouble, HeartPulse, Users, ShieldCheck } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { EmptyState, LoadingState } from "@/components/ui/EmptyState";
 
 interface Hospital {
   id: string;
   name: string;
-  latitude: number;
-  longitude: number;
   totalBeds: number;
   availableBeds: number;
-  icuBedsTotal: number;
-  icuBedsAvailable: number;
-  burnBedsAvailable: number;
-  oxygenAvailable: boolean;
-  bloodBagsAvailable: number;
+  icuBeds?: number;
+  icuBedsTotal?: number;
+  icuBedsAvailable?: number;
+  availableIcu?: number;
+  burnBeds?: number;
+  burnBedsAvailable?: number;
+  availableBurn?: number;
+  hasHelipad?: boolean;
+  hasDecon?: boolean;
+  oxygenSecured?: boolean;
+  status?: string;
   agency?: { name: string };
 }
 
 interface Shelter {
   id: string;
   name: string;
-  latitude: number;
-  longitude: number;
   capacity: number;
-  currentOccupancy: number;
-  foodStockDays: number;
-  waterLiters: number;
-  medicalStaffPresent: boolean;
+  /** Live API returns "occupied"; fallback data also uses "occupied" */
+  occupied?: number;
+  /** Some API shapes return currentOccupancy */
+  currentOccupancy?: number;
+  foodStockDays?: number;
+  waterLiters?: number;
   status: string;
   agency?: { name: string };
+}
+
+// ── Safe numeric helpers ────────────────────────────────────────────
+function safeNum(v: unknown): number {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+}
+
+function safeOccupancy(shelter: Shelter): number {
+  return safeNum(shelter.occupied ?? shelter.currentOccupancy);
+}
+
+function safePct(numerator: number, denominator: number): number {
+  if (!denominator || denominator === 0) return 0;
+  const p = Math.round((numerator / denominator) * 100);
+  return isNaN(p) ? 0 : Math.min(100, Math.max(0, p));
+}
+
+// ── Status badge helper ─────────────────────────────────────────────
+function shelterStatusClass(status: string): string {
+  switch (status?.toUpperCase()) {
+    case "OPEN":   return "badge badge-success";
+    case "FULL":   return "badge badge-warning";
+    case "CLOSED": return "badge badge-critical";
+    default:       return "badge badge-neutral";
+  }
 }
 
 export default function HospitalsPage() {
@@ -49,8 +83,8 @@ export default function HospitalsPage() {
         sheltRes.json(),
       ]);
 
-      if (hospJson.success) setHospitals(hospJson.data);
-      if (sheltJson.success) setShelters(sheltJson.data);
+      if (hospJson.success) setHospitals(hospJson.data ?? []);
+      if (sheltJson.success) setShelters(sheltJson.data ?? []);
     } catch (err) {
       console.error("Failed to load hospital/shelter data:", err);
     } finally {
@@ -58,14 +92,12 @@ export default function HospitalsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleUpdateHospitalBeds = async (id: string, delta: number) => {
     const hosp = hospitals.find((h) => h.id === id);
     if (!hosp) return;
-    const newBeds = Math.max(0, Math.min(hosp.totalBeds, hosp.availableBeds + delta));
+    const newBeds = Math.max(0, Math.min(safeNum(hosp.totalBeds), safeNum(hosp.availableBeds) + delta));
     setUpdatingId(id);
     try {
       const res = await fetch("/api/hospitals", {
@@ -74,9 +106,7 @@ export default function HospitalsPage() {
         body: JSON.stringify({ id, availableBeds: newBeds }),
       });
       const json = await res.json();
-      if (json.success) {
-        fetchData();
-      }
+      if (json.success) fetchData();
     } catch (err) {
       console.error("Update hospital failed:", err);
     } finally {
@@ -87,18 +117,17 @@ export default function HospitalsPage() {
   const handleUpdateShelterOccupancy = async (id: string, delta: number) => {
     const shelt = shelters.find((s) => s.id === id);
     if (!shelt) return;
-    const newOcc = Math.max(0, Math.min(shelt.capacity, shelt.currentOccupancy + delta));
+    const current = safeOccupancy(shelt);
+    const newOcc = Math.max(0, Math.min(safeNum(shelt.capacity), current + delta));
     setUpdatingId(id);
     try {
       const res = await fetch("/api/shelters", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, currentOccupancy: newOcc }),
+        body: JSON.stringify({ id, occupied: newOcc }),
       });
       const json = await res.json();
-      if (json.success) {
-        fetchData();
-      }
+      if (json.success) fetchData();
     } catch (err) {
       console.error("Update shelter failed:", err);
     } finally {
@@ -106,175 +135,237 @@ export default function HospitalsPage() {
     }
   };
 
-  const totalBeds = hospitals.reduce((acc, h) => acc + (h.totalBeds || 0), 0);
-  const totalAvailableBeds = hospitals.reduce((acc, h) => acc + (h.availableBeds || 0), 0);
+  // ── Aggregate metrics ─────────────────────────────────────────────
+  const totalBeds = hospitals.reduce((a, h) => a + safeNum(h.totalBeds), 0);
+  const totalAvailableBeds = hospitals.reduce((a, h) => a + safeNum(h.availableBeds), 0);
   const totalIcuAvailable = hospitals.reduce(
-    (acc, h) => acc + (h.icuBedsAvailable ?? (h as any).availableIcu ?? 0),
+    (a, h) => a + safeNum(h.availableIcu ?? h.icuBedsAvailable),
     0
   );
-  const totalShelterCapacity = shelters.reduce((acc, s) => acc + (s.capacity || 0), 0);
-  const totalShelterOccupancy = shelters.reduce((acc, s) => acc + (s.currentOccupancy || 0), 0);
+  const totalShelterCapacity = shelters.reduce((a, s) => a + safeNum(s.capacity), 0);
+  const totalShelterOccupancy = shelters.reduce((a, s) => a + safeOccupancy(s), 0);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100 flex items-center gap-3">
-            <span>🏥</span> Hospital Triage & Shelter Network
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Real-time critical care bed surge capacity, ICU allocations, oxygen reserves, and evacuation shelter logistics
-          </p>
+      {/* ── Page Header ────────────────────────────────────────────── */}
+      <PageHeader
+        title="Hospital Triage & Shelter Network"
+        description="Real-time critical care bed capacity, ICU allocations, oxygen reserves, and evacuation shelter logistics across the Gujarat Metro EOC."
+        icon={Building2}
+        iconColor="#3b82f6"
+        actions={
+          <button onClick={() => fetchData()} className="btn btn-secondary" style={{ fontSize: "13px" }}>
+            <RotateCcw size={14} />
+            Refresh Telemetry
+          </button>
+        }
+      />
+
+      {/* ── Aggregate Stats ──────────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+        {/* General Beds */}
+        <div className="card" style={{ padding: "20px", borderLeft: "3px solid #3b82f6" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+            <BedDouble size={16} color="#3b82f6" />
+            <span className="metric-label">General Beds</span>
+          </div>
+          <div className="data-value" style={{ fontSize: "28px", fontWeight: "700", color: "#f8fafc", letterSpacing: "-0.5px" }}>
+            {totalAvailableBeds.toLocaleString()}
+            <span style={{ fontSize: "16px", color: "var(--text-muted)", fontWeight: "500" }}>
+              {" "}/ {totalBeds.toLocaleString()}
+            </span>
+          </div>
+          <div style={{ fontSize: "12px", color: "#4ade80", fontWeight: "500", marginTop: "4px" }}>
+            {safePct(totalAvailableBeds, totalBeds)}% available
+          </div>
         </div>
 
-        <button
-          onClick={() => fetchData()}
-          className="btn-secondary text-xs flex items-center gap-1.5"
-        >
-          <span>🔄</span> Refresh Telemetry
-        </button>
+        {/* ICU Beds */}
+        <div className="card" style={{ padding: "20px", borderLeft: "3px solid #60a5fa" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+            <HeartPulse size={16} color="#60a5fa" />
+            <span className="metric-label">ICU Beds Available</span>
+          </div>
+          <div className="data-value" style={{ fontSize: "28px", fontWeight: "700", color: "#60a5fa", letterSpacing: "-0.5px" }}>
+            {totalIcuAvailable}
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>
+            Critical care ready
+          </div>
+        </div>
+
+        {/* Shelter Capacity */}
+        <div className="card" style={{ padding: "20px", borderLeft: "3px solid #f59e0b" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+            <Users size={16} color="#f59e0b" />
+            <span className="metric-label">Shelter Occupancy</span>
+          </div>
+          <div className="data-value" style={{ fontSize: "28px", fontWeight: "700", color: "#f59e0b", letterSpacing: "-0.5px" }}>
+            {totalShelterOccupancy.toLocaleString()}
+            <span style={{ fontSize: "16px", color: "var(--text-muted)", fontWeight: "500" }}>
+              {" "}/ {totalShelterCapacity.toLocaleString()}
+            </span>
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>
+            {Math.max(0, totalShelterCapacity - totalShelterOccupancy).toLocaleString()} vacancies
+          </div>
+        </div>
+
+        {/* Oxygen */}
+        <div className="card" style={{ padding: "20px", borderLeft: "3px solid #10b981" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+            <ShieldCheck size={16} color="#10b981" />
+            <span className="metric-label">Oxygen Security</span>
+          </div>
+          <div className="data-value" style={{ fontSize: "28px", fontWeight: "700", color: "#10b981", letterSpacing: "-0.5px" }}>
+            {hospitals.filter((h) => h.oxygenSecured).length}
+            <span style={{ fontSize: "16px", color: "var(--text-muted)", fontWeight: "500" }}>
+              {" "}/ {hospitals.length}
+            </span>
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>
+            Facilities oxygen-secured
+          </div>
+        </div>
       </div>
 
-      {/* Aggregate Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] text-slate-400 uppercase font-mono">Total Hospital Beds</div>
-          <div className="text-2xl font-black text-slate-100 font-mono">
-            {totalAvailableBeds} / {totalBeds}
-          </div>
-          <div className="text-[10px] text-emerald-400 font-semibold">
-            {Math.round((totalAvailableBeds / (totalBeds || 1)) * 100)}% Available
-          </div>
-        </div>
-
-        <div className="card p-4 space-y-1 border-l-4 border-l-blue-500">
-          <div className="text-[11px] text-blue-400 uppercase font-mono">Available ICU Beds</div>
-          <div className="text-2xl font-black text-blue-400 font-mono">{totalIcuAvailable}</div>
-          <div className="text-[10px] text-slate-400">Critical Care Ready</div>
-        </div>
-
-        <div className="card p-4 space-y-1 border-l-4 border-l-amber-500">
-          <div className="text-[11px] text-amber-400 uppercase font-mono">Shelter Capacity</div>
-          <div className="text-2xl font-black text-amber-400 font-mono">
-            {totalShelterOccupancy} / {totalShelterCapacity}
-          </div>
-          <div className="text-[10px] text-slate-400">
-            {Math.max(0, totalShelterCapacity - totalShelterOccupancy)} Vacancies
-          </div>
-        </div>
-
-        <div className="card p-4 space-y-1 border-l-4 border-l-emerald-500">
-          <div className="text-[11px] text-emerald-400 uppercase font-mono">Oxygen Security</div>
-          <div className="text-2xl font-black text-emerald-400 font-mono">100%</div>
-          <div className="text-[10px] text-slate-400">All Facilities Secured</div>
-        </div>
-      </div>
-
-      {/* Section 1: Hospitals */}
+      {/* ── Hospitals Section ─────────────────────────────────────── */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
-            <span>🏥</span> Hospital Emergency & Trauma Centers ({hospitals.length})
-          </h2>
-        </div>
+        <SectionHeader
+          title="Hospital Emergency & Trauma Centers"
+          count={hospitals.length}
+          icon={Building2}
+          iconColor="#60a5fa"
+          withDivider
+        />
 
         {loading ? (
-          <div className="card p-12 text-center text-slate-400">Loading hospital telemetry...</div>
+          <div className="card" style={{ padding: "48px" }}>
+            <LoadingState label="Loading hospital telemetry…" />
+          </div>
+        ) : hospitals.length === 0 ? (
+          <EmptyState
+            icon={Building2}
+            title="No Hospital Data Available"
+            description="Hospital telemetry could not be retrieved. Check data source connectivity."
+            action={{ label: "Retry", onClick: fetchData }}
+          />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" }}>
             {hospitals.map((hosp) => {
-              const total = hosp.totalBeds || 1;
-              const avail = hosp.availableBeds ?? 0;
-              const occupancyPct = Math.round(
-                ((total - avail) / total) * 100
-              );
+              const total   = safeNum(hosp.totalBeds) || 1;
+              const avail   = safeNum(hosp.availableBeds);
+              const occupancyPct = safePct(total - avail, total);
               const isHighOccupancy = occupancyPct >= 85;
-              const icuAvail = hosp.icuBedsAvailable ?? (hosp as any).availableIcu ?? 0;
-              const icuTot = hosp.icuBedsTotal ?? (hosp as any).icuBeds ?? icuAvail;
-              const burnAvail = hosp.burnBedsAvailable ?? (hosp as any).availableBurn ?? (hosp as any).burnBeds ?? 0;
-              const bloodAvail = hosp.bloodBagsAvailable ?? (hosp as any).bloodBags ?? 16;
+
+              const icuAvail = safeNum(hosp.availableIcu ?? hosp.icuBedsAvailable);
+              const icuTotal = safeNum(hosp.icuBeds ?? hosp.icuBedsTotal ?? hosp.icuBedsAvailable ?? hosp.availableIcu);
+              const burnAvail = safeNum(hosp.availableBurn ?? hosp.burnBedsAvailable ?? hosp.burnBeds);
 
               return (
                 <div
                   key={hosp.id}
-                  className={`card p-5 space-y-4 hover:border-slate-700 transition-all ${
-                    isHighOccupancy ? "border-l-4 border-l-amber-500" : "border-l-4 border-l-blue-500"
-                  }`}
+                  className="card"
+                  style={{
+                    padding: "24px",
+                    borderLeft: `3px solid ${isHighOccupancy ? "#f59e0b" : "#3b82f6"}`,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
+                  }}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  {/* Hospital name & status */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
                     <div>
-                      <h3 className="text-base font-bold text-slate-100">{hosp.name}</h3>
-                      <p className="text-xs text-slate-400">{hosp.agency?.name || "Medical Authority"}</p>
+                      <h3 style={{ fontSize: "15px", fontWeight: "600", color: "var(--text-primary)", lineHeight: "1.3" }}>
+                        {hosp.name}
+                      </h3>
+                      <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "3px" }}>
+                        {hosp.agency?.name || "Medical Authority"}
+                      </p>
                     </div>
-
-                    {isHighOccupancy ? (
-                      <span className="badge-critical text-[10px] px-2 py-0.5 rounded font-mono">
-                        NEAR SATURATION ({occupancyPct}%)
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-mono">
-                        NORMAL ({occupancyPct}%)
-                      </span>
-                    )}
+                    <span className={`badge ${isHighOccupancy ? "badge-warning" : "badge-success"}`}>
+                      {isHighOccupancy ? "Near Capacity" : "Normal"} · {occupancyPct}%
+                    </span>
                   </div>
 
-                  {/* Bed occupancy progress bar */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-mono">
-                      <span className="text-slate-400">General Bed Occupancy</span>
-                      <span className="text-slate-200 font-bold">
-                        {avail} Available / {total} Total
+                  {/* Bed occupancy bar */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                      <span className="metric-label">General Bed Occupancy</span>
+                      <span className="technical" style={{ fontSize: "12px", color: "var(--text-primary)", fontWeight: "600" }}>
+                        {avail.toLocaleString()} available / {total.toLocaleString()} total
                       </span>
                     </div>
-                    <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                    <div style={{ height: "6px", background: "rgba(255,255,255,0.06)", borderRadius: "4px", overflow: "hidden" }}>
                       <div
-                        style={{ width: `${Math.min(100, Math.max(0, occupancyPct))}%` }}
-                        className={`h-full transition-all duration-300 ${
-                          isHighOccupancy ? "bg-amber-500" : "bg-blue-500"
-                        }`}
+                        style={{
+                          width: `${occupancyPct}%`,
+                          height: "100%",
+                          background: isHighOccupancy ? "#f59e0b" : "#3b82f6",
+                          borderRadius: "4px",
+                          transition: "width 0.3s",
+                        }}
                       />
                     </div>
                   </div>
 
-                  {/* ICU & Specialty stats */}
-                  <div className="grid grid-cols-3 gap-2 pt-1 text-center font-mono text-xs">
-                    <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                      <div className="text-[10px] text-slate-500 uppercase">ICU Beds</div>
-                      <div className="text-sm font-bold text-blue-400 mt-0.5">
-                        {icuAvail} / {icuTot}
+                  {/* ICU, Burn & Facility indicators */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                    <div style={{ padding: "10px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-primary)", textAlign: "center" }}>
+                      <div className="metric-label" style={{ fontSize: "11px", marginBottom: "4px" }}>ICU Beds</div>
+                      <div className="data-value" style={{ fontSize: "15px", fontWeight: "700", color: "#60a5fa" }}>
+                        {icuAvail} / {icuTotal || "—"}
                       </div>
                     </div>
-                    <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                      <div className="text-[10px] text-slate-500 uppercase">Burn Units</div>
-                      <div className="text-sm font-bold text-purple-400 mt-0.5">
-                        {burnAvail} Ready
+                    <div style={{ padding: "10px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-primary)", textAlign: "center" }}>
+                      <div className="metric-label" style={{ fontSize: "11px", marginBottom: "4px" }}>Burn Units</div>
+                      <div className="data-value" style={{ fontSize: "15px", fontWeight: "700", color: "#c084fc" }}>
+                        {burnAvail > 0 ? `${burnAvail} ready` : "Not available"}
                       </div>
                     </div>
-                    <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                      <div className="text-[10px] text-slate-500 uppercase">Blood Reserves</div>
-                      <div className="text-sm font-bold text-red-400 mt-0.5">
-                        {bloodAvail} Units
+                    <div style={{ padding: "10px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-primary)", textAlign: "center" }}>
+                      <div className="metric-label" style={{ fontSize: "11px", marginBottom: "4px" }}>Oxygen</div>
+                      <div className="data-value" style={{ fontSize: "15px", fontWeight: "700", color: hosp.oxygenSecured ? "#4ade80" : "#f87171" }}>
+                        {hosp.oxygenSecured ? "Secured" : "Not secured"}
                       </div>
                     </div>
                   </div>
 
-                  {/* Fast Adjust Beds Controls */}
-                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-mono text-[11px]">Simulate Admission:</span>
-                    <div className="flex items-center gap-1.5">
+                  {/* Facility tags */}
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                    {hosp.hasHelipad && (
+                      <span className="badge badge-neutral">Helipad</span>
+                    )}
+                    {hosp.hasDecon && (
+                      <span className="badge badge-neutral">Decontamination</span>
+                    )}
+                  </div>
+
+                  {/* Simulate admission controls */}
+                  <div style={{
+                    paddingTop: "12px",
+                    borderTop: "1px solid var(--border-primary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Simulate Admission</span>
+                    <div style={{ display: "flex", gap: "6px" }}>
                       <button
                         onClick={() => handleUpdateHospitalBeds(hosp.id, -1)}
-                        disabled={updatingId === hosp.id || hosp.availableBeds <= 0}
-                        className="btn-secondary text-[11px] py-0.5 px-2 hover:bg-slate-800"
+                        disabled={updatingId === hosp.id || avail <= 0}
+                        className="btn btn-secondary"
+                        style={{ fontSize: "12px", padding: "4px 10px" }}
                         title="Admit 1 patient"
                       >
-                        -1 Bed
+                        −1 Bed
                       </button>
                       <button
                         onClick={() => handleUpdateHospitalBeds(hosp.id, 1)}
-                        disabled={updatingId === hosp.id || hosp.availableBeds >= hosp.totalBeds}
-                        className="btn-secondary text-[11px] py-0.5 px-2 hover:bg-slate-800"
+                        disabled={updatingId === hosp.id || avail >= total}
+                        className="btn btn-secondary"
+                        style={{ fontSize: "12px", padding: "4px 10px" }}
                         title="Discharge 1 patient"
                       >
                         +1 Bed
@@ -288,78 +379,123 @@ export default function HospitalsPage() {
         )}
       </div>
 
-      {/* Section 2: Shelters */}
-      <div className="space-y-4 pt-4 border-t border-slate-800">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
-            <span>⛺</span> Evacuation & Relief Shelters ({shelters.length})
-          </h2>
-        </div>
+      {/* ── Shelters Section ──────────────────────────────────────── */}
+      <div className="space-y-4" style={{ paddingTop: "8px" }}>
+        <SectionHeader
+          title="Evacuation & Relief Shelters"
+          count={shelters.length}
+          icon={Tent}
+          iconColor="#f59e0b"
+          withDivider
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {shelters.map((shelt) => {
-            const occupancyPct = Math.round((shelt.currentOccupancy / shelt.capacity) * 100);
+        {loading ? (
+          <div className="card" style={{ padding: "48px" }}>
+            <LoadingState label="Loading shelter logistics…" />
+          </div>
+        ) : shelters.length === 0 ? (
+          <EmptyState
+            icon={Tent}
+            title="No Shelter Data Available"
+            description="Shelter occupancy data could not be retrieved. Check data source connectivity."
+            action={{ label: "Retry", onClick: fetchData }}
+          />
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}>
+            {shelters.map((shelt) => {
+              const occupancy = safeOccupancy(shelt);
+              const capacity  = safeNum(shelt.capacity) || 1;
+              const pct       = safePct(occupancy, capacity);
+              const vacancies = Math.max(0, capacity - occupancy);
 
-            return (
-              <div
-                key={shelt.id}
-                className="card p-5 space-y-4 hover:border-slate-700 transition-all border-l-4 border-l-amber-500"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-100">{shelt.name}</h3>
-                    <p className="text-xs text-slate-400">{shelt.agency?.name || "Civil Defense"}</p>
-                  </div>
-                  <span className="badge-neutral text-[10px] px-2 py-0.5 rounded font-mono">
-                    {shelt.status}
-                  </span>
-                </div>
-
-                {/* Progress */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs font-mono">
-                    <span className="text-slate-400">Occupancy</span>
-                    <span className="text-amber-400 font-bold">
-                      {shelt.currentOccupancy} / {shelt.capacity} ({occupancyPct}%)
+              return (
+                <div
+                  key={shelt.id}
+                  className="card"
+                  style={{ padding: "24px", borderLeft: "3px solid #f59e0b", display: "flex", flexDirection: "column", gap: "14px" }}
+                >
+                  {/* Name & status */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px" }}>
+                    <div>
+                      <h3 style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-primary)", lineHeight: "1.3" }}>
+                        {shelt.name}
+                      </h3>
+                      <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "3px" }}>
+                        {shelt.agency?.name || "Civil Defense Authority"}
+                      </p>
+                    </div>
+                    <span className={shelterStatusClass(shelt.status)}>
+                      {shelt.status || "Unknown"}
                     </span>
                   </div>
-                  <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                    <div
-                      style={{ width: `${occupancyPct}%` }}
-                      className="h-full bg-amber-500 transition-all duration-300"
-                    />
-                  </div>
-                </div>
 
-                {/* Logistics */}
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                    <div className="text-[10px] text-slate-500 uppercase">Food Supplies</div>
-                    <div className="font-bold text-slate-200 mt-0.5">{shelt.foodStockDays} Days Stock</div>
+                  {/* Occupancy bar */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                      <span className="metric-label">Occupancy</span>
+                      <span className="technical" style={{ fontSize: "12px", color: "#f59e0b", fontWeight: "600" }}>
+                        {occupancy} / {capacity} ({pct}%)
+                      </span>
+                    </div>
+                    <div style={{ height: "6px", background: "rgba(255,255,255,0.06)", borderRadius: "4px", overflow: "hidden" }}>
+                      <div
+                        style={{
+                          width: `${pct}%`,
+                          height: "100%",
+                          background: pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : "#4ade80",
+                          borderRadius: "4px",
+                          transition: "width 0.3s",
+                        }}
+                      />
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "5px" }}>
+                      {vacancies} vacancies remaining
+                    </div>
                   </div>
-                  <div className="p-2 bg-slate-950 rounded border border-slate-800">
-                    <div className="text-[10px] text-slate-500 uppercase">Potable Water</div>
-                    <div className="font-bold text-blue-400 mt-0.5">{shelt.waterLiters} Liters</div>
-                  </div>
-                </div>
 
-                {/* Quick adjust */}
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 font-mono text-[11px]">Evacuee Check-in:</span>
-                  <div className="flex items-center gap-1.5">
+                  {/* Logistics */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                    <div style={{ padding: "10px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-primary)" }}>
+                      <div className="metric-label" style={{ fontSize: "11px", marginBottom: "4px" }}>Food Supplies</div>
+                      <div className="data-value" style={{ fontSize: "14px", fontWeight: "600", color: "var(--text-primary)" }}>
+                        {shelt.foodStockDays != null && shelt.foodStockDays > 0
+                          ? `${shelt.foodStockDays} day stock`
+                          : "Not available"}
+                      </div>
+                    </div>
+                    <div style={{ padding: "10px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-primary)" }}>
+                      <div className="metric-label" style={{ fontSize: "11px", marginBottom: "4px" }}>Potable Water</div>
+                      <div className="data-value" style={{ fontSize: "14px", fontWeight: "600", color: "#60a5fa" }}>
+                        {shelt.waterLiters != null && shelt.waterLiters > 0
+                          ? `${shelt.waterLiters.toLocaleString()} L`
+                          : "Not available"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Evacuee check-in control */}
+                  <div style={{
+                    paddingTop: "12px",
+                    borderTop: "1px solid var(--border-primary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}>
+                    <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Evacuee Check-in</span>
                     <button
                       onClick={() => handleUpdateShelterOccupancy(shelt.id, 10)}
-                      disabled={updatingId === shelt.id || shelt.currentOccupancy >= shelt.capacity}
-                      className="btn-secondary text-[11px] py-0.5 px-2"
+                      disabled={updatingId === shelt.id || occupancy >= capacity}
+                      className="btn btn-secondary"
+                      style={{ fontSize: "12px", padding: "4px 10px" }}
                     >
                       +10 Evacuees
                     </button>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

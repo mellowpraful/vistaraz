@@ -10,6 +10,7 @@ import { ResourceTableView } from "@/components/resources/ResourceTableView";
 import { ResourceFilterBar } from "@/components/resources/ResourceFilterBar";
 import { ResourceStatsOverview } from "@/components/resources/ResourceStatsOverview";
 import { EmptyState, LoadingState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
 import {
   RotateCcw,
   Shield,
@@ -18,7 +19,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Wifi,
-  Sparkles,
 } from "lucide-react";
 
 const RESOURCE_TYPES = [
@@ -248,36 +248,29 @@ export default function ResourcesPage() {
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-black tracking-tight text-slate-100 flex items-center gap-2">
-              <span className="p-1.5 bg-blue-950 border border-blue-800 rounded-lg text-xl">🛡️</span>
-              Emergency Fleet & Resource Registry
-            </h1>
-          </div>
-          <p className="text-sm text-slate-400 mt-1">
-            Real-time multi-agency fleet telemetry, capability tracking, readiness levels, and field unit dispatch status
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          {/* Live Status Indicator */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs font-mono text-slate-300">
+      <PageHeader
+        title="Emergency Fleet & Resource Registry"
+        description="Real-time multi-agency fleet telemetry, capability tracking, readiness levels, and field unit dispatch status"
+        icon={Shield}
+        iconColor="#3b82f6"
+        badge={
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-md text-xs font-mono text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span>Telemetry Feed Live</span>
           </div>
-
+        }
+        actions={
           <button
             onClick={() => fetchResources(true)}
             disabled={isRefreshing || loading}
-            className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-2"
+            className="btn btn-secondary text-xs flex items-center gap-1.5"
+            style={{ padding: "8px 14px", fontSize: "12px" }}
           >
             <RotateCcw size={14} className={isRefreshing ? "animate-spin text-blue-400" : ""} />
-            <span>{isRefreshing ? "Refreshing..." : "Refresh Telemetry"}</span>
+            <span>{isRefreshing ? "Refreshing…" : "Refresh Telemetry"}</span>
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Feedback / Notification Banner */}
       {feedbackMessage && (
@@ -369,7 +362,7 @@ export default function ResourcesPage() {
           />
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredResources.map((resource) => (
             <ResourceCard
               key={resource.id}

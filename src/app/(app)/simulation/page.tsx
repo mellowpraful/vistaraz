@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Activity, Play, Pause, RotateCcw, FastForward, Rewind,
   Plus, ShieldCheck, AlertTriangle, Layers, BarChart2,
-  CheckCircle, Compass, X,
+  CheckCircle, Compass, X, Lock,
 } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { SimulatedResourceState } from "@/app/api/simulation/route";
 
 interface SimulationEvent {
@@ -242,6 +243,13 @@ export default function SimulationPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      {/* ── PAGE HEADER ── */}
+      <PageHeader
+        title="Digital Twin Simulation & Stress Testing"
+        description="Run multi-phase emergency scenarios, model cascade failures, evaluate resource readiness, and stress-test response workflows in an isolated sandbox."
+        icon={Activity}
+        iconColor="#a855f7"
+      />
 
       {/* ── SANDBOX ISOLATION BANNER ── */}
       <div style={{
@@ -978,8 +986,10 @@ export default function SimulationPage() {
               border: "1px solid rgba(217,119,6,0.35)", borderRadius: "10px",
               fontSize: "13px", color: "#fde68a",
               fontFamily: "'JetBrains Mono', monospace",
+              display: "flex", alignItems: "center", gap: "10px",
             }}>
-              🔒 Scenario will be generated with 3 cascade events. Live production DB will not be altered.
+              <Lock size={15} color="#fbbf24" style={{ flexShrink: 0 }} />
+              <span>Scenario will be generated with 3 cascade events. Live production DB will not be altered.</span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", paddingTop: "8px", borderTop: "1px solid var(--border-primary)" }}>

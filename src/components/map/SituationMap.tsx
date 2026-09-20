@@ -5,7 +5,6 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-le
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Link from "next/link";
-import { INCIDENT_TYPE_ICONS } from "@/lib/types";
 
 // Ensure Leaflet default icon paths are resolved
 if (typeof window !== "undefined") {
@@ -17,15 +16,27 @@ if (typeof window !== "undefined") {
   });
 }
 
-// Custom SVG map icons
-const createCustomIcon = (emoji: string, bgColor: string, isCritical?: boolean) => {
+// Crisp Vector SVG map icons
+const MAP_SVGS = {
+  INCIDENT_CRITICAL: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  INCIDENT_DEFAULT: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  AMBULANCE: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="14" rx="2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M12 8v6M9 11h6"/></svg>`,
+  FIRE_ENGINE: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`,
+  BOAT: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20a6 6 0 0 0 6-2 6 6 0 0 1 6-2 6 6 0 0 0 6 2 6 6 0 0 1 6 2"/><path d="M4 10l8-6 8 6-2 6H6z"/></svg>`,
+  DRONE: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="3"/></svg>`,
+  RESOURCE_DEFAULT: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  HOSPITAL: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  SHELTER: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+};
+
+const createCustomIcon = (svgMarkup: string, bgColor: string, isCritical?: boolean) => {
   const pulseHtml = isCritical
     ? `<div style="
         position: absolute;
-        inset: -8px;
+        inset: -7px;
         border-radius: 50%;
         background: ${bgColor};
-        opacity: 0.4;
+        opacity: 0.5;
         animation: radar-ring 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
         pointer-events: none;
       "></div>`
@@ -33,28 +44,27 @@ const createCustomIcon = (emoji: string, bgColor: string, isCritical?: boolean) 
 
   return L.divIcon({
     className: "custom-map-pin",
-    html: `<div style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+    html: `<div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;">
       ${pulseHtml}
       <div style="
         background-color: ${bgColor};
-        width: 32px;
-        height: 32px;
+        width: 30px;
+        height: 30px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 15px;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.6), 0 0 12px ${bgColor}80;
-        border: 2px solid #ffffff;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.8), 0 0 12px ${bgColor}90;
+        border: 2px solid rgba(255,255,255,0.9);
         cursor: pointer;
         position: relative;
         z-index: 2;
         transition: transform 0.15s ease;
-      ">${emoji}</div>
+      ">${svgMarkup}</div>
     </div>`,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -20],
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -18],
   });
 };
 
@@ -148,8 +158,8 @@ export default function SituationMap({
     return (
       <div className="h-full w-full flex items-center justify-center bg-slate-950 text-slate-400">
         <div className="flex flex-col items-center gap-2">
-          <div className="animate-spin text-3xl">🌐</div>
-          <span className="text-xs text-slate-500">Loading Geospatial Engine...</span>
+          <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+          <span className="text-xs font-mono text-slate-400">Loading Geospatial Engine...</span>
         </div>
       </div>
     );
@@ -202,6 +212,21 @@ export default function SituationMap({
     }
   };
 
+  const getResourceSvg = (type: string) => {
+    switch (type) {
+      case "AMBULANCE":
+        return MAP_SVGS.AMBULANCE;
+      case "FIRE_ENGINE":
+        return MAP_SVGS.FIRE_ENGINE;
+      case "BOAT":
+        return MAP_SVGS.BOAT;
+      case "DRONE":
+        return MAP_SVGS.DRONE;
+      default:
+        return MAP_SVGS.RESOURCE_DEFAULT;
+    }
+  };
+
   const validLat = typeof centerLat === "number" && !isNaN(centerLat) ? centerLat : 23.0225;
   const validLng = typeof centerLng === "number" && !isNaN(centerLng) ? centerLng : 72.5714;
   const validZoom = typeof zoom === "number" && !isNaN(zoom) ? zoom : 12;
@@ -216,9 +241,12 @@ export default function SituationMap({
     >
       <MapUpdater center={[validLat, validLng]} zoom={validZoom} />
 
+      {/* CartoDB Dark Matter High-Contrast EOC Tiles */}
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        subdomains="abcd"
+        maxZoom={19}
       />
 
       {/* Flood / Hazard Simulation Circles */}
@@ -230,7 +258,7 @@ export default function SituationMap({
             pathOptions={{
               color: "#3b82f6",
               fillColor: "#1d4ed8",
-              fillOpacity: 0.25,
+              fillOpacity: 0.22,
               weight: 2,
               dashArray: "6, 6",
             }}
@@ -251,10 +279,11 @@ export default function SituationMap({
       {/* Incidents Markers */}
       {safeLayers.incidents &&
         safeIncidents.map((inc) => {
+          const isCritical = inc.severity === "CRITICAL";
           const icon = createCustomIcon(
-            INCIDENT_TYPE_ICONS[inc.type as keyof typeof INCIDENT_TYPE_ICONS] || "🚨",
+            isCritical ? MAP_SVGS.INCIDENT_CRITICAL : MAP_SVGS.INCIDENT_DEFAULT,
             getIncidentBg(inc.severity),
-            inc.severity === "CRITICAL"
+            isCritical
           );
 
           return (
@@ -267,23 +296,23 @@ export default function SituationMap({
               }}
             >
               <Popup className="custom-popup">
-                <div className="p-2 space-y-1.5 text-slate-900 min-w-[200px]">
+                <div className="p-3 space-y-2 text-slate-100 min-w-[220px] bg-slate-900 rounded-lg border border-slate-700">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-xs">{inc.title}</span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">
+                    <span className="font-bold text-xs text-white">{inc.title}</span>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-950 text-red-300 border border-red-800">
                       {inc.severity}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-600 line-clamp-2">
-                    📍 {inc.locationName || "Scene Location"}
+                  <p className="text-[11px] text-slate-300 line-clamp-2">
+                    {inc.locationName || "Scene Location"}
                   </p>
-                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200">
-                    <span>Status: <strong>{inc.status}</strong></span>
+                  <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-800">
+                    <span className="text-slate-400 font-mono text-[10px]">Status: <strong className="text-slate-200">{inc.status}</strong></span>
                     <Link
-                      href={`/incidents/${inc.id}`}
-                      className="text-blue-600 font-bold hover:underline"
+                      href={`/dispatch?incidentId=${inc.id}`}
+                      className="text-blue-400 font-bold hover:text-blue-300 text-xs"
                     >
-                      SITREP →
+                      Dispatch →
                     </Link>
                   </div>
                 </div>
@@ -296,15 +325,7 @@ export default function SituationMap({
       {safeLayers.resources &&
         safeResources.map((res) => {
           const icon = createCustomIcon(
-            res.type === "AMBULANCE"
-              ? "🚑"
-              : res.type === "FIRE_ENGINE"
-              ? "🚒"
-              : res.type === "BOAT"
-              ? "🚤"
-              : res.type === "DRONE"
-              ? "🚁"
-              : "🛡️",
+            getResourceSvg(res.type),
             getResourceBg(res.status)
           );
 
@@ -317,11 +338,11 @@ export default function SituationMap({
                 click: () => onSelectEntity(res, "RESOURCE"),
               }}
             >
-              <Popup>
-                <div className="p-2 space-y-1 text-slate-900 min-w-[180px]">
-                  <div className="font-bold text-xs">{res.name}</div>
-                  <div className="text-[11px] text-slate-600">{res.agency?.name || "Emergency Response Agency"}</div>
-                  <div className="text-[10px] font-mono text-emerald-700 font-semibold">
+              <Popup className="custom-popup">
+                <div className="p-3 space-y-1.5 text-slate-100 min-w-[190px] bg-slate-900 rounded-lg border border-slate-700">
+                  <div className="font-bold text-xs text-white">{res.name}</div>
+                  <div className="text-[11px] text-slate-400">{res.agency?.name || "Emergency Agency"}</div>
+                  <div className="text-[10px] font-mono text-emerald-400 font-semibold pt-1 border-t border-slate-800">
                     Status: {res.status}
                   </div>
                 </div>
@@ -333,7 +354,7 @@ export default function SituationMap({
       {/* Hospitals Markers */}
       {safeLayers.hospitals &&
         safeHospitals.map((hosp) => {
-          const icon = createCustomIcon("🏥", "#0284c7");
+          const icon = createCustomIcon(MAP_SVGS.HOSPITAL, "#0284c7");
           return (
             <Marker
               key={`hosp-${hosp.id}`}
@@ -343,11 +364,14 @@ export default function SituationMap({
                 click: () => onSelectEntity(hosp, "HOSPITAL"),
               }}
             >
-              <Popup>
-                <div className="p-2 space-y-1 text-slate-900 min-w-[180px]">
-                  <div className="font-bold text-xs">{hosp.name}</div>
-                  <div className="text-[11px] text-slate-700">
-                    Beds: {hosp.availableBeds ?? 0}/{hosp.totalBeds ?? 0} (ICU: {hosp.icuBedsAvailable ?? hosp.availableIcu ?? 0})
+              <Popup className="custom-popup">
+                <div className="p-3 space-y-1.5 text-slate-100 min-w-[200px] bg-slate-900 rounded-lg border border-slate-700">
+                  <div className="font-bold text-xs text-white">{hosp.name}</div>
+                  <div className="text-[11px] text-slate-300">
+                    Beds: <strong className="text-emerald-400">{hosp.availableBeds ?? 0}/{hosp.totalBeds ?? 0}</strong>
+                  </div>
+                  <div className="text-[10px] font-mono text-blue-300">
+                    ICU Available: {hosp.icuBedsAvailable ?? hosp.availableIcu ?? 0}
                   </div>
                 </div>
               </Popup>
@@ -358,7 +382,7 @@ export default function SituationMap({
       {/* Shelters Markers */}
       {safeLayers.shelters &&
         safeShelters.map((shelter) => {
-          const icon = createCustomIcon("⛺", "#d97706");
+          const icon = createCustomIcon(MAP_SVGS.SHELTER, "#d97706");
           return (
             <Marker
               key={`shelt-${shelter.id}`}
@@ -368,11 +392,11 @@ export default function SituationMap({
                 click: () => onSelectEntity(shelter, "SHELTER"),
               }}
             >
-              <Popup>
-                <div className="p-2 space-y-1 text-slate-900 min-w-[180px]">
-                  <div className="font-bold text-xs">{shelter.name}</div>
-                  <div className="text-[11px] text-slate-700">
-                    Occupancy: {shelter.currentOccupancy ?? shelter.occupied ?? 0}/{shelter.capacity ?? 0}
+              <Popup className="custom-popup">
+                <div className="p-3 space-y-1.5 text-slate-100 min-w-[200px] bg-slate-900 rounded-lg border border-slate-700">
+                  <div className="font-bold text-xs text-white">{shelter.name}</div>
+                  <div className="text-[11px] text-slate-300">
+                    Occupancy: <strong className="text-amber-400">{shelter.currentOccupancy ?? shelter.occupied ?? 0}/{shelter.capacity ?? 0}</strong>
                   </div>
                 </div>
               </Popup>

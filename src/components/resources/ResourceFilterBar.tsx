@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Search, Filter, X, LayoutGrid, List, SlidersHorizontal } from "lucide-react";
-import { RESOURCE_TYPE_ICONS } from "@/lib/types";
 
 interface ResourceFilterBarProps {
   searchQuery: string;
@@ -55,128 +54,190 @@ export function ResourceFilterBar({
     selectedCapability !== "ALL";
 
   return (
-    <div className="card p-4 space-y-3 bg-slate-900/80 border-slate-800">
+    <div
+      style={{
+        background: "rgba(15, 23, 42, 0.65)",
+        border: "1px solid var(--border-primary)",
+        borderRadius: "12px",
+        padding: "16px 20px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "14px",
+      }}
+    >
       {/* Search & Main Selectors */}
-      <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
         {/* Search input */}
-        <div className="flex-1 relative min-w-[240px]">
-          <Search size={15} className="absolute left-3 top-3 text-slate-400" />
+        <div style={{ position: "relative", flex: "1 1 280px", minWidth: "220px" }}>
+          <Search size={15} style={{ position: "absolute", left: "12px", top: "11px", color: "var(--text-muted)", pointerEvents: "none" }} />
           <input
             type="text"
-            placeholder="Search by name, callsign, agency, equipment, location..."
+            placeholder="Search fleet by callsign, agency, equipment, location…"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="input pl-9 pr-8 text-xs w-full bg-slate-950/70 border-slate-800 focus:border-blue-500 text-slate-100 placeholder:text-slate-500 rounded-lg h-9"
+            className="input"
+            style={{
+              paddingLeft: "36px",
+              paddingRight: searchQuery ? "32px" : "12px",
+              fontSize: "13px",
+              width: "100%",
+              height: "38px",
+            }}
           />
           {searchQuery && (
             <button
               onClick={() => onSearchChange("")}
-              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-200"
+              style={{
+                position: "absolute",
+                right: "10px",
+                top: "10px",
+                background: "transparent",
+                border: "none",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+              }}
             >
-              <X size={14} />
+              <X size={15} />
             </button>
           )}
         </div>
 
-        {/* Dropdowns */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Agency Filter */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">Agency:</span>
-            <select
-              value={selectedAgency}
-              onChange={(e) => onAgencyChange(e.target.value)}
-              className="input py-1 px-2.5 text-xs bg-slate-950/80 border-slate-800 rounded-lg h-9 max-w-[170px]"
-            >
-              <option value="ALL">All Agencies ({agenciesList.length})</option>
-              {agenciesList.map((agency) => (
-                <option key={agency} value={agency}>
-                  {agency}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Filters and View Switcher */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          {/* Agency */}
+          <select
+            value={selectedAgency}
+            onChange={(e) => onAgencyChange(e.target.value)}
+            className="input"
+            style={{ fontSize: "12.5px", height: "38px", minWidth: "140px", cursor: "pointer" }}
+          >
+            <option value="ALL">All Agencies ({agenciesList.length})</option>
+            {agenciesList.map((agency) => (
+              <option key={agency} value={agency}>
+                {agency}
+              </option>
+            ))}
+          </select>
 
-          {/* Type Filter */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">Type:</span>
-            <select
-              value={selectedType}
-              onChange={(e) => onTypeChange(e.target.value)}
-              className="input py-1 px-2.5 text-xs bg-slate-950/80 border-slate-800 rounded-lg h-9 max-w-[170px]"
-            >
-              <option value="ALL">All Types</option>
-              {typesList.map((t) => (
-                <option key={t} value={t}>
-                  {RESOURCE_TYPE_ICONS[t] ? `${RESOURCE_TYPE_ICONS[t]} ` : ""}
-                  {t.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Unit Type */}
+          <select
+            value={selectedType}
+            onChange={(e) => onTypeChange(e.target.value)}
+            className="input"
+            style={{ fontSize: "12.5px", height: "38px", minWidth: "140px", cursor: "pointer" }}
+          >
+            <option value="ALL">All Unit Types</option>
+            {typesList.map((t) => (
+              <option key={t} value={t}>
+                {t.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
 
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">Status:</span>
-            <select
-              value={selectedStatus}
-              onChange={(e) => onStatusChange(e.target.value)}
-              className="input py-1 px-2.5 text-xs bg-slate-950/80 border-slate-800 rounded-lg h-9"
-            >
-              <option value="ALL">All Statuses</option>
-              {statusesList.map((s) => (
-                <option key={s} value={s}>
-                  {s.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Status */}
+          <select
+            value={selectedStatus}
+            onChange={(e) => onStatusChange(e.target.value)}
+            className="input"
+            style={{ fontSize: "12.5px", height: "38px", minWidth: "130px", cursor: "pointer" }}
+          >
+            <option value="ALL">All Statuses</option>
+            {statusesList.map((s) => (
+              <option key={s} value={s}>
+                {s.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
 
-          {/* View Mode Switcher */}
-          <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-lg p-0.5 h-9">
+          {/* View mode toggle */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              background: "rgba(3, 7, 18, 0.6)",
+              border: "1px solid var(--border-primary)",
+              borderRadius: "8px",
+              padding: "2px",
+              height: "38px",
+            }}
+          >
             <button
               onClick={() => onViewModeChange("grid")}
-              className={`px-2.5 py-1 rounded text-xs flex items-center gap-1 transition ${
-                viewMode === "grid"
-                  ? "bg-slate-800 text-blue-400 font-semibold shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-              title="Grid Card View"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                border: "none",
+                background: viewMode === "grid" ? "rgba(59, 130, 246, 0.2)" : "transparent",
+                color: viewMode === "grid" ? "#60a5fa" : "var(--text-muted)",
+                fontSize: "12px",
+                fontWeight: viewMode === "grid" ? "600" : "500",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              title="Grid View"
             >
               <LayoutGrid size={14} />
-              <span className="hidden md:inline">Grid</span>
+              <span>Grid</span>
             </button>
             <button
               onClick={() => onViewModeChange("table")}
-              className={`px-2.5 py-1 rounded text-xs flex items-center gap-1 transition ${
-                viewMode === "table"
-                  ? "bg-slate-800 text-blue-400 font-semibold shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-              title="Dense Table View"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                border: "none",
+                background: viewMode === "table" ? "rgba(59, 130, 246, 0.2)" : "transparent",
+                color: viewMode === "table" ? "#60a5fa" : "var(--text-muted)",
+                fontSize: "12px",
+                fontWeight: viewMode === "table" ? "600" : "500",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              title="Table View"
             >
               <List size={14} />
-              <span className="hidden md:inline">Table</span>
+              <span>Table</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Capability Quick-Filter Chips & Result Count */}
-      <div className="pt-2 border-t border-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] uppercase font-mono text-slate-400 flex items-center gap-1 mr-1">
-            <SlidersHorizontal size={11} /> Capability:
+      {/* Capability Filter Chips & Counts */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px",
+          paddingTop: "12px",
+          borderTop: "1px solid var(--border-primary)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.4px", display: "flex", alignItems: "center", gap: "5px", marginRight: "4px" }}>
+            <SlidersHorizontal size={12} /> Capability:
           </span>
           <button
             onClick={() => onCapabilityChange("ALL")}
-            className={`text-[10px] px-2 py-0.5 rounded font-mono transition ${
-              selectedCapability === "ALL"
-                ? "bg-blue-600 text-white font-bold"
-                : "bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700"
-            }`}
+            style={{
+              fontSize: "11.5px",
+              padding: "3px 10px",
+              borderRadius: "6px",
+              border: selectedCapability === "ALL" ? "1px solid #3b82f6" : "1px solid var(--border-primary)",
+              background: selectedCapability === "ALL" ? "rgba(59, 130, 246, 0.25)" : "rgba(255,255,255,0.03)",
+              color: selectedCapability === "ALL" ? "#93c5fd" : "var(--text-secondary)",
+              fontWeight: selectedCapability === "ALL" ? "600" : "400",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
           >
-            ALL
+            All
           </button>
           {capabilitiesList.slice(0, 6).map((cap) => {
             const isSelected = selectedCapability === cap;
@@ -184,11 +245,17 @@ export function ResourceFilterBar({
               <button
                 key={cap}
                 onClick={() => onCapabilityChange(isSelected ? "ALL" : cap)}
-                className={`text-[10px] px-2 py-0.5 rounded font-mono transition ${
-                  isSelected
-                    ? "bg-blue-600 text-white font-bold"
-                    : "bg-slate-800/80 text-slate-300 border border-slate-700/60 hover:border-slate-500"
-                }`}
+                style={{
+                  fontSize: "11.5px",
+                  padding: "3px 10px",
+                  borderRadius: "6px",
+                  border: isSelected ? "1px solid #3b82f6" : "1px solid var(--border-primary)",
+                  background: isSelected ? "rgba(59, 130, 246, 0.25)" : "rgba(255,255,255,0.03)",
+                  color: isSelected ? "#93c5fd" : "var(--text-secondary)",
+                  fontWeight: isSelected ? "600" : "400",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
               >
                 {cap.replace(/_/g, " ")}
               </button>
@@ -196,15 +263,27 @@ export function ResourceFilterBar({
           })}
         </div>
 
-        <div className="flex items-center gap-3 text-xs justify-between sm:justify-end">
-          <span className="text-[11px] font-mono text-slate-400">
-            Showing <span className="font-bold text-slate-100">{filteredCount}</span> of {totalCount} units
+        {/* Counter and Clear filter */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+            Showing <strong style={{ color: "var(--text-primary)" }}>{filteredCount}</strong> of {totalCount} units
           </span>
 
           {hasActiveFilters && (
             <button
               onClick={onResetFilters}
-              className="text-[10px] font-mono text-red-400 hover:text-red-300 flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-red-950/40 transition"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                fontSize: "11.5px",
+                color: "#f87171",
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid rgba(239, 68, 68, 0.25)",
+                borderRadius: "6px",
+                padding: "3px 8px",
+                cursor: "pointer",
+              }}
             >
               <X size={12} /> Clear Filters
             </button>
