@@ -28,26 +28,25 @@ export function MetricCard({
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="card"
       style={{
-        background: hovered
-          ? `linear-gradient(145deg, rgba(21, 31, 50, 0.95) 0%, rgba(15, 22, 35, 0.95) 100%)`
-          : `linear-gradient(145deg, rgba(15, 22, 35, 0.85) 0%, rgba(10, 14, 23, 0.85) 100%)`,
+        background: hovered ? "var(--bg-card-hover)" : "var(--bg-card)",
         borderStyle: "solid",
         borderTopWidth: "2px",
         borderRightWidth: "1px",
         borderBottomWidth: "1px",
         borderLeftWidth: "1px",
         borderTopColor: color,
-        borderRightColor: hovered ? `${color}60` : "rgba(255, 255, 255, 0.08)",
-        borderBottomColor: hovered ? `${color}60` : "rgba(255, 255, 255, 0.08)",
-        borderLeftColor: hovered ? `${color}60` : "rgba(255, 255, 255, 0.08)",
+        borderRightColor: hovered ? `${color}60` : "var(--border-primary)",
+        borderBottomColor: hovered ? `${color}60` : "var(--border-primary)",
+        borderLeftColor: hovered ? `${color}60` : "var(--border-primary)",
         borderRadius: "10px",
         padding: "20px",
-        transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        transition: "all 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
         cursor: href ? "pointer" : "default",
         boxShadow: hovered
           ? `0 10px 30px -5px ${color}25, 0 0 15px ${color}15`
-          : "0 4px 20px rgba(0, 0, 0, 0.25)",
+          : "0 4px 18px rgba(0, 0, 0, 0.06)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
         animation: pulse ? "pulse-critical 2s ease-in-out infinite" : undefined,

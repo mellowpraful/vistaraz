@@ -34,7 +34,8 @@ export function ResourceStatsOverview({
       sub: "100% telemetry synced",
       icon: Shield,
       color: "#3b82f6",
-      bgHover: "rgba(59, 130, 246, 0.05)",
+      bgClass: "bg-blue-500/10 border-blue-500/30 text-blue-400",
+      accentBorder: "#3b82f6",
     },
     {
       id: "AVAILABLE",
@@ -43,7 +44,8 @@ export function ResourceStatsOverview({
       sub: `${availabilityPct}% immediate readiness`,
       icon: CheckCircle2,
       color: "#22c55e",
-      bgHover: "rgba(34, 197, 94, 0.05)",
+      bgClass: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
+      accentBorder: "#22c55e",
     },
     {
       id: "DEPLOYED_GROUP",
@@ -52,7 +54,8 @@ export function ResourceStatsOverview({
       sub: `${deploymentPct}% field deployment`,
       icon: Navigation,
       color: "#f59e0b",
-      bgHover: "rgba(245, 158, 11, 0.05)",
+      bgClass: "bg-amber-500/10 border-amber-500/30 text-amber-400",
+      accentBorder: "#f59e0b",
     },
     {
       id: "STANDBY",
@@ -61,7 +64,8 @@ export function ResourceStatsOverview({
       sub: "Stationed / on standby",
       icon: PauseCircle,
       color: "#94a3b8",
-      bgHover: "rgba(148, 163, 184, 0.05)",
+      bgClass: "bg-slate-500/10 border-slate-500/30 text-slate-400",
+      accentBorder: "#94a3b8",
     },
     {
       id: "OUT_OF_SERVICE",
@@ -70,12 +74,13 @@ export function ResourceStatsOverview({
       sub: "Maintenance / refit",
       icon: Wrench,
       color: "#ef4444",
-      bgHover: "rgba(239, 68, 68, 0.05)",
+      bgClass: "bg-red-500/10 border-red-500/30 text-red-400",
+      accentBorder: "#ef4444",
     },
   ];
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
       {stats.map((stat) => {
         const Icon = stat.icon;
         const isSelected =
@@ -92,54 +97,46 @@ export function ResourceStatsOverview({
                 onSelectStatusFilter(selectedStatus === stat.id ? "ALL" : stat.id);
               }
             }}
+            className={`card p-6 rounded-2xl text-left flex flex-col justify-between min-h-[148px] transition-all duration-300 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer ${
+              isSelected
+                ? "ring-2 ring-offset-2 ring-offset-transparent shadow-lg"
+                : "hover:border-slate-700"
+            }`}
             style={{
-              padding: "16px 18px",
-              textAlign: "left",
-              background: isSelected
-                ? "linear-gradient(145deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-                : "rgba(15, 23, 42, 0.6)",
-              border: isSelected
-                ? `1px solid ${stat.color}`
-                : "1px solid var(--border-primary)",
-              borderLeft: `3px solid ${stat.color}`,
-              borderRadius: "10px",
-              cursor: "pointer",
-              transition: "all 0.18s ease",
-              boxShadow: isSelected ? `0 0 16px ${stat.color}25` : "none",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
+              borderColor: isSelected ? stat.accentBorder : undefined,
+              boxShadow: isSelected ? `0 8px 24px ${stat.accentBorder}25` : undefined,
+              borderLeft: `4px solid ${stat.accentBorder}`,
             }}
           >
             {/* Top row: Label + Icon */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-              <span className="metric-label" style={{ fontSize: "12px", fontWeight: "600" }}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
                 {stat.label}
               </span>
               <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
                 style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "7px",
-                  background: `${stat.color}15`,
-                  border: `1px solid ${stat.color}30`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
+                  background: `${stat.color}18`,
+                  border: `1px solid ${stat.color}35`,
+                  color: stat.color,
                 }}
               >
-                <Icon size={14} color={stat.color} />
+                <Icon size={16} />
               </div>
             </div>
 
-            {/* Middle row: Number */}
-            <div className="data-value" style={{ fontSize: "26px", fontWeight: "700", color: "var(--text-primary)", lineHeight: "1.1" }}>
-              {stat.value}
+            {/* Middle row: Big Number */}
+            <div className="my-1">
+              <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-slate-100 dark:text-slate-100">
+                {stat.value}
+              </span>
             </div>
 
-            {/* Bottom row: Context subtitle */}
-            <div style={{ fontSize: "11.5px", color: isSelected ? stat.color : "var(--text-muted)", fontWeight: "500" }}>
+            {/* Bottom row: Subtitle context */}
+            <div
+              className="text-xs font-medium pt-2 border-t border-slate-800/60 dark:border-slate-800/60"
+              style={{ color: isSelected ? stat.color : "var(--text-muted)" }}
+            >
               {stat.sub}
             </div>
           </button>

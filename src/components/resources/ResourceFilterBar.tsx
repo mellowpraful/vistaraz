@@ -54,62 +54,39 @@ export function ResourceFilterBar({
     selectedCapability !== "ALL";
 
   return (
-    <div
-      style={{
-        background: "rgba(15, 23, 42, 0.65)",
-        border: "1px solid var(--border-primary)",
-        borderRadius: "12px",
-        padding: "16px 20px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "14px",
-      }}
-    >
-      {/* Search & Main Selectors */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+    <div className="card p-6 sm:p-7 rounded-3xl space-y-5 shadow-xl">
+      {/* Search & Main Selectors Row */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
         {/* Search input */}
-        <div style={{ position: "relative", flex: "1 1 280px", minWidth: "220px" }}>
-          <Search size={15} style={{ position: "absolute", left: "12px", top: "11px", color: "var(--text-muted)", pointerEvents: "none" }} />
+        <div className="relative flex-1 min-w-[260px]">
+          <Search
+            size={18}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
           <input
             type="text"
             placeholder="Search fleet by callsign, agency, equipment, location…"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="input"
-            style={{
-              paddingLeft: "36px",
-              paddingRight: searchQuery ? "32px" : "12px",
-              fontSize: "13px",
-              width: "100%",
-              height: "38px",
-            }}
+            className="input pl-11 pr-10 text-sm w-full h-12 rounded-2xl bg-slate-950/60 dark:bg-slate-950/60 border-slate-800 focus:border-blue-500 transition-all"
           />
           {searchQuery && (
             <button
               onClick={() => onSearchChange("")}
-              style={{
-                position: "absolute",
-                right: "10px",
-                top: "10px",
-                background: "transparent",
-                border: "none",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-              }}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-1"
             >
-              <X size={15} />
+              <X size={16} />
             </button>
           )}
         </div>
 
         {/* Filters and View Switcher */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <div className="flex flex-wrap items-center gap-3">
           {/* Agency */}
           <select
             value={selectedAgency}
             onChange={(e) => onAgencyChange(e.target.value)}
-            className="input"
-            style={{ fontSize: "12.5px", height: "38px", minWidth: "140px", cursor: "pointer" }}
+            className="input text-xs sm:text-sm h-12 min-w-[150px] rounded-2xl bg-slate-950/60 dark:bg-slate-950/60 border-slate-800 cursor-pointer font-medium"
           >
             <option value="ALL">All Agencies ({agenciesList.length})</option>
             {agenciesList.map((agency) => (
@@ -123,8 +100,7 @@ export function ResourceFilterBar({
           <select
             value={selectedType}
             onChange={(e) => onTypeChange(e.target.value)}
-            className="input"
-            style={{ fontSize: "12.5px", height: "38px", minWidth: "140px", cursor: "pointer" }}
+            className="input text-xs sm:text-sm h-12 min-w-[150px] rounded-2xl bg-slate-950/60 dark:bg-slate-950/60 border-slate-800 cursor-pointer font-medium"
           >
             <option value="ALL">All Unit Types</option>
             {typesList.map((t) => (
@@ -138,8 +114,7 @@ export function ResourceFilterBar({
           <select
             value={selectedStatus}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="input"
-            style={{ fontSize: "12.5px", height: "38px", minWidth: "130px", cursor: "pointer" }}
+            className="input text-xs sm:text-sm h-12 min-w-[140px] rounded-2xl bg-slate-950/60 dark:bg-slate-950/60 border-slate-800 cursor-pointer font-medium"
           >
             <option value="ALL">All Statuses</option>
             {statusesList.map((s) => (
@@ -150,112 +125,62 @@ export function ResourceFilterBar({
           </select>
 
           {/* View mode toggle */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              background: "rgba(3, 7, 18, 0.6)",
-              border: "1px solid var(--border-primary)",
-              borderRadius: "8px",
-              padding: "2px",
-              height: "38px",
-            }}
-          >
+          <div className="flex items-center bg-slate-950/80 dark:bg-slate-950/80 border border-slate-800 p-1 rounded-2xl h-12">
             <button
               onClick={() => onViewModeChange("grid")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "5px",
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "none",
-                background: viewMode === "grid" ? "rgba(59, 130, 246, 0.2)" : "transparent",
-                color: viewMode === "grid" ? "#60a5fa" : "var(--text-muted)",
-                fontSize: "12px",
-                fontWeight: viewMode === "grid" ? "600" : "500",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === "grid"
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "text-slate-400 hover:text-white"
+              }`}
               title="Grid View"
             >
-              <LayoutGrid size={14} />
+              <LayoutGrid size={15} />
               <span>Grid</span>
             </button>
             <button
               onClick={() => onViewModeChange("table")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "5px",
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "none",
-                background: viewMode === "table" ? "rgba(59, 130, 246, 0.2)" : "transparent",
-                color: viewMode === "table" ? "#60a5fa" : "var(--text-muted)",
-                fontSize: "12px",
-                fontWeight: viewMode === "table" ? "600" : "500",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "text-slate-400 hover:text-white"
+              }`}
               title="Table View"
             >
-              <List size={14} />
+              <List size={15} />
               <span>Table</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Capability Filter Chips & Counts */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-          paddingTop: "12px",
-          borderTop: "1px solid var(--border-primary)",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.4px", display: "flex", alignItems: "center", gap: "5px", marginRight: "4px" }}>
-            <SlidersHorizontal size={12} /> Capability:
+      {/* Capability Filter Chips & Unit Counts */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-800/80">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mr-1 font-mono">
+            <SlidersHorizontal size={14} className="text-blue-400" /> Capabilities:
           </span>
           <button
             onClick={() => onCapabilityChange("ALL")}
-            style={{
-              fontSize: "11.5px",
-              padding: "3px 10px",
-              borderRadius: "6px",
-              border: selectedCapability === "ALL" ? "1px solid #3b82f6" : "1px solid var(--border-primary)",
-              background: selectedCapability === "ALL" ? "rgba(59, 130, 246, 0.25)" : "rgba(255,255,255,0.03)",
-              color: selectedCapability === "ALL" ? "#93c5fd" : "var(--text-secondary)",
-              fontWeight: selectedCapability === "ALL" ? "600" : "400",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
+            className={`text-xs px-3.5 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
+              selectedCapability === "ALL"
+                ? "bg-blue-600 text-white shadow-sm font-bold"
+                : "bg-slate-950/60 text-slate-300 border border-slate-800 hover:border-slate-700"
+            }`}
           >
             All
           </button>
-          {capabilitiesList.slice(0, 6).map((cap) => {
+          {capabilitiesList.slice(0, 7).map((cap) => {
             const isSelected = selectedCapability === cap;
             return (
               <button
                 key={cap}
                 onClick={() => onCapabilityChange(isSelected ? "ALL" : cap)}
-                style={{
-                  fontSize: "11.5px",
-                  padding: "3px 10px",
-                  borderRadius: "6px",
-                  border: isSelected ? "1px solid #3b82f6" : "1px solid var(--border-primary)",
-                  background: isSelected ? "rgba(59, 130, 246, 0.25)" : "rgba(255,255,255,0.03)",
-                  color: isSelected ? "#93c5fd" : "var(--text-secondary)",
-                  fontWeight: isSelected ? "600" : "400",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                }}
+                className={`text-xs px-3.5 py-1.5 rounded-xl font-medium transition-all cursor-pointer ${
+                  isSelected
+                    ? "bg-blue-600 text-white shadow-sm font-bold"
+                    : "bg-slate-950/60 text-slate-300 border border-slate-800 hover:border-slate-700"
+                }`}
               >
                 {cap.replace(/_/g, " ")}
               </button>
@@ -264,28 +189,17 @@ export function ResourceFilterBar({
         </div>
 
         {/* Counter and Clear filter */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-            Showing <strong style={{ color: "var(--text-primary)" }}>{filteredCount}</strong> of {totalCount} units
+        <div className="flex items-center gap-3 self-end sm:self-center">
+          <span className="text-xs text-slate-400 font-mono">
+            Showing <strong className="text-white font-bold">{filteredCount}</strong> of {totalCount} units
           </span>
 
           {hasActiveFilters && (
             <button
               onClick={onResetFilters}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                fontSize: "11.5px",
-                color: "#f87171",
-                background: "rgba(239, 68, 68, 0.1)",
-                border: "1px solid rgba(239, 68, 68, 0.25)",
-                borderRadius: "6px",
-                padding: "3px 8px",
-                cursor: "pointer",
-              }}
+              className="flex items-center gap-1.5 text-xs text-red-400 bg-red-950/50 hover:bg-red-950 border border-red-800/80 rounded-xl px-3 py-1.5 transition-colors cursor-pointer font-mono font-medium"
             >
-              <X size={12} /> Clear Filters
+              <X size={13} /> Clear Filters
             </button>
           )}
         </div>
