@@ -464,7 +464,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <button
-                onClick={() => { localStorage.clear(); router.push("/"); }}
+                onClick={() => { localStorage.clear(); router.push("/login"); }}
                 style={{
                   flex: 1,
                   padding: "7px 10px",
@@ -575,7 +575,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {theme === "dark" ? <Sun size={15} color="#f59e0b" /> : <Moon size={15} color="#3b82f6" />}
             </button>
             <button
-              onClick={() => { localStorage.clear(); router.push("/"); }}
+              onClick={() => { localStorage.clear(); router.push("/login"); }}
               title="Sign Out"
               style={{
                 width: "36px",
